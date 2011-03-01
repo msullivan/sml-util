@@ -12,6 +12,7 @@ Group is
     libs/timeout.sml
     libs/union-find.sml
     libs/util.sml
+    libs/print.sml
 
     tests/fact-benches.sml
     tests/int-map-test.sml

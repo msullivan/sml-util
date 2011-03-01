@@ -93,6 +93,3 @@ struct
   fun transitive_closure graph =
       M.mapi (fn (n,_) => find_reachable graph n) graph
 end
-
-structure OperGraph = Graph(OperSet)
-structure IntGraph = Graph(IntSet)

@@ -322,7 +322,5 @@ struct
 end
 
 (* Then you can do... *)
-(*
 structure WordMap = WordMapFn(WordWordable)
 structure IntMap = WordMapFn(IntWordable)
-*)
