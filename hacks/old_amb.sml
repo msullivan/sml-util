@@ -11,9 +11,9 @@ struct
 
    datatype 'a backtrack = BChoice of 'a | BBacktrack
 
-   fun new_amb () =
+   fun 'a new_amb () =
        let
-           val conts = ref nil
+           val conts : 'a backtrack cont list ref = ref nil
                        
            fun amb nil = 
                (case conts
