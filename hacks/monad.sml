@@ -125,7 +125,7 @@ open IOMonadUtil
 structure Test =
 struct
   fun println s = print (s ^ "\n")
-  val main = mapM_ print [ "fuck ", "bitches ", "get ", "money\n" ]
+  val main = mapM_ print [ "one ", "two ", "three ", "four\n" ]
 
   val main2 =
       refM "hello " >>= (fn r =>
