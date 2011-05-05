@@ -57,8 +57,8 @@ structure IO : IO =
 struct
   type 'a monad = unit -> 'a 
   type 'a IO = 'a monad
-  fun unsafePerformIO f = f ()
 
+  fun unsafePerformIO f = f ()
   fun return x () = x
   fun bind mx k () = (k (mx ())) ()
 
@@ -78,7 +78,7 @@ struct
   fun input s () = TextIO.input s
   fun inputAll s () = TextIO.input s
   fun output stream s () = TextIO.output (stream, s)
-  val print = fn s => fn () => TextIO.print s
+  fun print s () = TextIO.print s
 end
 
 structure IOM = IO :> MONAD where type 'a monad = 'a IO.IO
@@ -132,6 +132,10 @@ struct
       !r >>= (fn s =>
       print s >>
       println "world"))
+
+  fun prompt s = println s >> inputLine' stdIn
+
+  val inputmain = prompt "something? "
 
   val mainloop : unit IO = forever $ println "loool!"
 
