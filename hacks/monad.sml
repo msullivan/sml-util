@@ -2,10 +2,12 @@
  * http://existentialtype.wordpress.com/2011/05/01/of-course-ml-has-monads/ *)
 
 infixr 0 $
-infixr >>=
-infixr >>
+infix >>=
+infix 1 >>
 infixr =<<
-infixr >=>
+infixr 1 >=>
+infix 4 <$>
+infix 4 <*>
 
 fun f $ x = f x
 fun id x = x
@@ -62,7 +64,7 @@ struct
   fun return x () = x
   fun bind mx k () = (k (mx ())) ()
 
-  val refM = fn x => fn () => ref x
+  fun refM x () = ref x
   fun ! x () = General.! x
   fun x := y = fn () => General.:= (x, y)
 
@@ -114,6 +116,21 @@ in
 
   fun join m = m >>= id
 
+  (* Some of these are names stolen from haskell functions
+   * over Functor and Applicative instances. *)
+  fun fmap f mx = mx >>= (fn x => return $ f x)
+  fun f <$> x = fmap f x
+  val liftM = fmap
+  fun liftM2 f m1 m2 =
+      m1 >>= (fn x1 => m2 >>= (fn x2 => return $ f x1 x2))
+  fun liftM3 f m1 m2 m3 =
+      m1 >>= (fn x1 => m2 >>= (fn x2 => m3 >>= (fn x3 => return $ f x1 x2 x3)))
+
+  fun ap f x = liftM2 id f x
+  fun f <*> x = ap f x
+
+
+
 end
 end
 
@@ -135,7 +152,8 @@ struct
 
   fun prompt s = println s >> inputLine' stdIn
 
-  val inputmain = prompt "something? "
+  fun exclaim s = s ^ "!"
+  val inputmain = prompt "something? " >>= println o exclaim
 
   val mainloop : unit IO = forever $ println "loool!"
 
