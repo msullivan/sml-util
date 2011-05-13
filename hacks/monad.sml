@@ -2,7 +2,6 @@
  * http://existentialtype.wordpress.com/2011/05/01/of-course-ml-has-monads/ *)
 (* TODO: maybe have a hierarchy of signatures: Functor, Applicative, Monad *)
 
-
 (* Infix operators can be nice. *)
 infixr 0 $
 infix 1 >>= >>
@@ -12,8 +11,6 @@ infix 4 <$> <*>
 (* Useful utility functions *)
 fun f $ x = f x
 fun id x = x
-fun const x y = x
-
 
 signature MONAD =
 sig
@@ -33,12 +30,22 @@ struct
   fun f >=> g = fn x => f x >>= g
   fun g <=< f = fn x => f x >>= g
 
+  (* Some of these are names stolen from haskell functions
+   * over Functor and Applicative instances. *)
+  fun fmap f mx = mx >>= (fn x => return $ f x)
+  fun f <$> x = fmap f x
+  val liftM = fmap
+  fun liftM2 f m1 m2 =
+      m1 >>= (fn x1 => m2 >>= (fn x2 => return $ f x1 x2))
+  (* Sigh, SML. Why don't you curry more? *)
+  fun liftM2' f (m1, m2) =
+      m1 >>= (fn x1 => m2 >>= (fn x2 => return $ f (x1, x2)))
+
+  fun ap f x = liftM2 id f x
+  fun f <*> x = ap f x
+
   fun sequence ms =
-      let fun k (m, m') =
-              m >>= (fn x =>
-              m' >>= (fn xs =>
-              return (x::xs)))
-      in foldr k (return []) ms end
+      foldr (liftM2' (op ::)) (return []) ms
 
   fun sequence_ ms = foldr (op >>) (return ()) ms
 
@@ -52,19 +59,6 @@ struct
   fun forever a = a >>= (fn _ => forever a)
 
   fun join m = m >>= id
-
-  (* Some of these are names stolen from haskell functions
-   * over Functor and Applicative instances. *)
-  fun fmap f mx = mx >>= (fn x => return $ f x)
-  fun f <$> x = fmap f x
-  val liftM = fmap
-  fun liftM2 f m1 m2 =
-      m1 >>= (fn x1 => m2 >>= (fn x2 => return $ f x1 x2))
-  fun liftM3 f m1 m2 m3 =
-      m1 >>= (fn x1 => m2 >>= (fn x2 => m3 >>= (fn x3 => return $ f x1 x2 x3)))
-
-  fun ap f x = liftM2 id f x
-  fun f <*> x = ap f x
 end
 
 (******************** Now for some monads. **********************)
