@@ -14,9 +14,9 @@ fun id x = x
 
 signature MONAD =
 sig
-  type 'a t
-  val return : 'a -> 'a t
-  val >>= : 'a t * ('a -> 'b t) -> 'b t
+  type 'a m
+  val return : 'a -> 'a m
+  val >>= : 'a m * ('a -> 'b m) -> 'b m
 end
 
 signature MONAD_UTIL =
@@ -24,36 +24,36 @@ sig
   include MONAD
 
   (* A synonym for >>= *)
-  val bind : 'a t -> ('a -> 'b t) -> 'b t
+  val bind : 'a m -> ('a -> 'b m) -> 'b m
 
   (* A handful of sequencing related operators. *)
-  val =<< : ('a -> 'b t) * 'a t -> 'b t
-  val >> : 'a t * 'b t -> 'b t
-  val >=> : ('a -> 'b t) * ('b -> 'c t) -> 'a -> 'c t
-  val <=< : ('a -> 'b t) * ('c -> 'a t) -> 'c -> 'b t
+  val =<< : ('a -> 'b m) * 'a m -> 'b m
+  val >> : 'a m * 'b m -> 'b m
+  val >=> : ('a -> 'b m) * ('b -> 'c m) -> 'a -> 'c m
+  val <=< : ('a -> 'b m) * ('c -> 'a m) -> 'c -> 'b m
 
   (* Functions for sequencing lists. *)
-  val sequence : 'a t list -> 'a list t
-  val sequence_ : 'a t list -> unit t
-  val mapM : ('a -> 'b t) -> 'a list -> 'b list t
-  val mapM_ : ('a -> 'b t) -> 'a list -> unit t
-  val forM : 'a list -> ('a -> 'b t) -> 'b list t
-  val forM_ : 'a list -> ('a -> 'b t) -> unit t
+  val sequence : 'a m list -> 'a list m
+  val sequence_ : 'a m list -> unit m
+  val mapM : ('a -> 'b m) -> 'a list -> 'b list m
+  val mapM_ : ('a -> 'b m) -> 'a list -> unit m
+  val forM : 'a list -> ('a -> 'b m) -> 'b list m
+  val forM_ : 'a list -> ('a -> 'b m) -> unit m
 
-  (* Functions for lifting other functions into ts. *)
-  val liftM : ('a -> 'b) -> 'a t -> 'b t
-  val liftM2 : ('a -> 'b -> 'c) -> 'a t -> 'b t -> 'c t
-  val liftM3 : ('a -> 'b -> 'c -> 'd) -> 'a t -> 'b t -> 'c t -> 'd t
-  val liftM2' : ('a * 'b -> 'c) -> 'a t * 'b t -> 'c t
+  (* Functions for lifting other functions into monads. *)
+  val liftM : ('a -> 'b) -> 'a m -> 'b m
+  val liftM2 : ('a -> 'b -> 'c) -> 'a m -> 'b m -> 'c m
+  val liftM3 : ('a -> 'b -> 'c -> 'd) -> 'a m -> 'b m -> 'c m -> 'd m
+  val liftM2' : ('a * 'b -> 'c) -> 'a m * 'b m -> 'c m
 
   (* Things that properly belong in a functor or applicative. *)
-  val fmap : ('a -> 'b) -> 'a t -> 'b t
-  val <$> : ('a -> 'b) * 'a t -> 'b t
-  val ap : ('a -> 'b) t -> 'a t -> 'b t
-  val <*> : ('a -> 'b) t * 'a t -> 'b t
+  val fmap : ('a -> 'b) -> 'a m -> 'b m
+  val <$> : ('a -> 'b) * 'a m -> 'b m
+  val ap : ('a -> 'b) m -> 'a m -> 'b m
+  val <*> : ('a -> 'b) m * 'a m -> 'b m
 
-  val forever : 'a t -> 'b t
-  val join : 'a t t -> 'a t
+  val forever : 'a m -> 'b m
+  val join : 'a m m -> 'a m
 end
 
 functor MonadUtil(M : MONAD) : MONAD_UTIL =
@@ -105,14 +105,14 @@ end
 (* The option monad is the canonical first example. *)
 structure OptionM : MONAD =
 struct
-  type 'a t = 'a option
+  type 'a m = 'a option
   val return = SOME
   fun x >>= k = Option.mapPartial k x
 end
 
 structure IdentityM : MONAD =
 struct
-  type 'a t = 'a
+  type 'a m = 'a
   val return = id
   fun m >>= f = f m
 end
@@ -122,7 +122,7 @@ end
  * be handy, though. *)
 structure ListM : MONAD =
 struct
-  type 'a t = 'a list
+  type 'a m = 'a list
   fun return x = [x]
   fun xs >>= f = List.concat (map f xs)
 end
@@ -134,30 +134,30 @@ sig
   type state
 
   (* The core functions. *)
-  val runState : 'a t -> state -> 'a * state
-  val get : state t
-  val put : state -> unit t
+  val runState : 'a m -> state -> 'a * state
+  val get : state m
+  val put : state -> unit m
 
   (* Utility functions. *)
-  val modify : (state -> state) -> unit t
-  val gets : (state -> 'a) -> 'a t
-  val evalState : 'a t -> state -> 'a
-  val execState : 'a t -> state -> state
-  val mapState : ('a * state -> 'b * state) -> 'a t -> 'b t
-  val withState : (state -> state) -> 'a t -> 'a t
+  val modify : (state -> state) -> unit m
+  val gets : (state -> 'a) -> 'a m
+  val evalState : 'a m -> state -> 'a
+  val execState : 'a m -> state -> state
+  val mapState : ('a * state -> 'b * state) -> 'a m -> 'b m
+  val withState : (state -> state) -> 'a m -> 'a m
 end
 
 functor StateFn(type t) : STATE =
 struct
   type state = t
-  type 'a t = state -> 'a * state
+  type 'a m = state -> 'a * state
 
   fun return x s = (x, s)
   fun m >>= f = fn s => let val (x, s') = m s
                         in f x s' end
 
   fun runState m s = m s
-  val runState : 'a t -> state -> 'a * state = runState
+  val runState : 'a m -> state -> 'a * state = runState
 
   fun get s = (s, s)
   fun put s _ = ((), s)
@@ -180,7 +180,7 @@ end
 signature IO =
 sig
   include MONAD
-  type 'a IO = 'a t
+  type 'a IO = 'a m
   val unsafePerformIO : 'a IO -> 'a
 
   (* References *)
@@ -206,8 +206,8 @@ end
 
 structure IO : IO =
 struct
-  type 'a t = unit -> 'a 
-  type 'a IO = 'a t
+  type 'a m = unit -> 'a
+  type 'a IO = 'a m
 
   fun unsafePerformIO m = m ()
   fun return x () = x
@@ -232,7 +232,7 @@ struct
   fun print s () = TextIO.print s
 end
 
-structure IOM = IO :> MONAD where type 'a t = 'a IO.IO
+structure IOM = IO :> MONAD where type 'a m = 'a IO.IO
 
 
 (* This really is prettier with typeclasses. Le sigh. *)
