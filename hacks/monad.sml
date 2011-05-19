@@ -19,7 +19,44 @@ sig
   val >>= : 'a monad * ('a -> 'b monad) -> 'b monad
 end
 
-functor MonadUtil(M : MONAD) =
+signature MONAD_UTIL =
+sig
+  include MONAD
+
+  (* A synonym for >>= *)
+  val bind : 'a monad -> ('a -> 'b monad) -> 'b monad
+
+  (* A handful of sequencing related operators. *)
+  val =<< : ('a -> 'b monad) * 'a monad -> 'b monad
+  val >> : 'a monad * 'b monad -> 'b monad
+  val >=> : ('a -> 'b monad) * ('b -> 'c monad) -> 'a -> 'c monad
+  val <=< : ('a -> 'b monad) * ('c -> 'a monad) -> 'c -> 'b monad
+
+  (* Functions for sequencing lists. *)
+  val sequence : 'a monad list -> 'a list monad
+  val sequence_ : 'a monad list -> unit monad
+  val mapM : ('a -> 'b monad) -> 'a list -> 'b list monad
+  val mapM_ : ('a -> 'b monad) -> 'a list -> unit monad
+  val forM : 'a list -> ('a -> 'b monad) -> 'b list monad
+  val forM_ : 'a list -> ('a -> 'b monad) -> unit monad
+
+  (* Functions for lifting other functions into monads. *)
+  val liftM : ('a -> 'b) -> 'a monad -> 'b monad
+  val liftM2 : ('a -> 'b -> 'c) -> 'a monad -> 'b monad -> 'c monad
+  val liftM3 : ('a -> 'b -> 'c -> 'd) -> 'a monad -> 'b monad -> 'c monad -> 'd monad
+  val liftM2' : ('a * 'b -> 'c) -> 'a monad * 'b monad -> 'c monad
+
+  (* Things that properly belong in a functor or applicative. *)
+  val fmap : ('a -> 'b) -> 'a monad -> 'b monad
+  val <$> : ('a -> 'b) * 'a monad -> 'b monad
+  val ap : ('a -> 'b) monad -> 'a monad -> 'b monad
+  val <*> : ('a -> 'b) monad * 'a monad -> 'b monad
+
+  val forever : 'a monad -> 'b monad
+  val join : 'a monad monad -> 'a monad
+end
+
+functor MonadUtil(M : MONAD) : MONAD_UTIL =
 struct
   open M
 
@@ -37,6 +74,8 @@ struct
   val liftM = fmap
   fun liftM2 f m1 m2 =
       m1 >>= (fn x1 => m2 >>= (fn x2 => return $ f x1 x2))
+  fun liftM3 f m1 m2 m3 =
+      m1 >>= (fn x1 => m2 >>= (fn x2 => m3 >>= (fn x3 => return $ f x1 x2 x3)))
   (* Sigh, SML. Why don't you curry more? *)
   fun liftM2' f (m1, m2) =
       m1 >>= (fn x1 => m2 >>= (fn x2 => return $ f (x1, x2)))
