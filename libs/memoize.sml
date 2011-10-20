@@ -38,6 +38,8 @@ struct
       in f' end
 end
 
+structure MemoTest =
+struct
 fun fib' _ 0 = 0 : IntInf.int
   | fib' _ 1 = 1
   | fib' f n = (f (n-1)) + (f (n-2))
@@ -50,3 +52,4 @@ val fib = Memoize.memoize Word.fromInt (op =) fib'
 val hyperbinary = Memoize.memoize Word.fromLargeInt (op =) hyperbinary'
 
 val test = hyperbinary 100000000000000
+end

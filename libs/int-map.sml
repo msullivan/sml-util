@@ -1,4 +1,8 @@
-(* Patricia trie based maps on keys that can be mapped to integers.
+(* BUG: I have reason to believe that something doesn't work. I strongly
+ * suspect it is a change I made or something I added and not a problem
+ * in Okasaki's original code...
+ *
+ * Patricia trie based maps on keys that can be mapped to integers.
  * Fleshed out into a full ORD_MAP implementation by
  * Michael Sullivan <sully@msully.net>.
  *
