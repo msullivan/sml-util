@@ -1,18 +1,12 @@
 Group is
     $/basis.cm
     $/smlnj-lib.cm
+    libs/sully-lib.cm
 
     hacks/fix.sml
+    hacks/amb.sml
+    hacks/monad.sml
     (*hacks/lazy.sml*)
-
-    libs/goodmap.sml
-    libs/graph.sml
-    libs/int-map.sml
-    libs/memoize.sml
-    libs/timeout.sml
-    libs/union-find.sml
-    libs/util.sml
-    libs/print.sml
 
     tests/fact-benches.sml
     tests/int-map-test.sml
