@@ -94,7 +94,8 @@ struct
               else rev (x1::z) :: loop nil (x2::xs)
       in loop [] end
 
-  fun dedup (x::l) = foldl (fn (e,a) => e :: (List.filter (fn x => not (x = e)) a)) [x] l
+  fun dedup [] = []
+    | dedup (x::xs) = x :: dedup (List.filter (fn y => not (x = y)) xs)
 
   fun option z _ NONE = z
     | option _ f (SOME x) = f x
@@ -139,5 +140,13 @@ struct
       foldl1 (fn ((i, x), (i', x')) =>
                  if cmp (x, x') = GREATER then (i, x) else (i', x'))
              (enumerate l))
-  
+
+  fun findIndexBy f y l =
+      let fun search' _ nil = NONE
+            | search' i (x::xs) = if f (y, x) then SOME i
+                                  else search' (i+1) xs
+      in search' 0 l end
+  fun findIndex y l = findIndexBy (op =) y l
+  fun lookupBy f x l = Option.map second (List.find (fn (x', _) => f (x, x')) l)
+  fun lookup x l = lookupBy (op =) x l
 end
