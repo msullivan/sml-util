@@ -228,9 +228,9 @@ struct
   fun foldr f m = foldri (fn (_,x,z)=>f (x,z)) m
 
 
-  fun listItemsi m = foldli (fn (k,x,l) => (k,x)::l) nil m
-  fun listKeys m = foldli (fn (k,_,l) => k::l) nil m
-  fun listItems m = foldl (op ::) nil m
+  fun listItemsi m = foldri (fn (k,x,l) => (k,x)::l) nil m
+  fun listKeys m = foldri (fn (k,_,l) => k::l) nil m
+  fun listItems m = foldr (op ::) nil m
 
   (* FIXME: This is an atrocious implementation of collate. It is linear in the best
    * case instead of in just the worst case. *)
