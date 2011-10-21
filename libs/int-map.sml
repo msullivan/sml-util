@@ -243,12 +243,12 @@ struct
   fun intersectWith f (m1, m2) = let
       (* iterate over the elements of m1, checking for membership in m2 *)
       fun intersect f (m1, m2) = let
-	  fun ins (key, x, m) = (case find(m2, key)
-		                  of NONE => m
-			           | (SOME x') => insert(m, key, f(x, x'))
-		                (* end case *))
+          fun ins (key, x, m) = (case find(m2, key)
+                                  of NONE => m
+                                   | (SOME x') => insert(m, key, f(x, x'))
+                                (* end case *))
       in
-	  foldli ins empty m1
+          foldli ins empty m1
       end
   in
       if (numItems m1 > numItems m2)
@@ -259,12 +259,12 @@ struct
   fun intersectWithi f (m1, m2) = let
       (* iterate over the elements of m1, checking for membership in m2 *)
       fun intersect f (m1, m2) = let
-	  fun ins (key, x, m) = (case find(m2, key)
-		                  of NONE => m
-			           | (SOME x') => insert(m, key, f(key, x, x'))
-		                (* end case *))
+          fun ins (key, x, m) = (case find(m2, key)
+                                  of NONE => m
+                                   | (SOME x') => insert(m, key, f(key, x, x'))
+                                (* end case *))
       in
-	  foldli ins empty m1
+          foldli ins empty m1
       end
   in
       if (numItems m1 > numItems m2)
@@ -274,36 +274,36 @@ struct
 
   fun mergeWith f (m1, m2) = let
       fun merge ([], [], m) = m
-	| merge ((k1, x1)::r1, [], m) = mergef (k1, SOME x1, NONE, r1, [], m)
+        | merge ((k1, x1)::r1, [], m) = mergef (k1, SOME x1, NONE, r1, [], m)
         | merge ([], (k2, x2)::r2, m) = mergef (k2, NONE, SOME x2, [], r2, m)
-	| merge (m1 as ((k1, x1)::r1), m2 as ((k2, x2)::r2), m) = (
-	  case Key.compare (k1, k2)
-	   of LESS => mergef (k1, SOME x1, NONE, r1, m2, m)
-	    | EQUAL => mergef (k1, SOME x1, SOME x2, r1, r2, m)
-	    | GREATER => mergef (k2, NONE, SOME x2, m1, r2, m)
-	  (* end case *))
+        | merge (m1 as ((k1, x1)::r1), m2 as ((k2, x2)::r2), m) = (
+          case Key.compare (k1, k2)
+           of LESS => mergef (k1, SOME x1, NONE, r1, m2, m)
+            | EQUAL => mergef (k1, SOME x1, SOME x2, r1, r2, m)
+            | GREATER => mergef (k2, NONE, SOME x2, m1, r2, m)
+          (* end case *))
       and mergef (k, x1, x2, r1, r2, m) = (case f (x1, x2)
-		                            of NONE => merge (r1, r2, m)
-		                             | SOME y => merge (r1, r2, insert(m, k, y))
-		                          (* end case *))
+                                            of NONE => merge (r1, r2, m)
+                                             | SOME y => merge (r1, r2, insert(m, k, y))
+                                          (* end case *))
   in
       merge (listItemsi m1, listItemsi m2, empty)
   end
 
   fun mergeWithi f (m1, m2) = let
       fun merge ([], [], m) = m
-	| merge ((k1, x1)::r1, [], m) = mergef (k1, SOME x1, NONE, r1, [], m)
-	| merge ([], (k2, x2)::r2, m) = mergef (k2, NONE, SOME x2, [], r2, m)
+        | merge ((k1, x1)::r1, [], m) = mergef (k1, SOME x1, NONE, r1, [], m)
+        | merge ([], (k2, x2)::r2, m) = mergef (k2, NONE, SOME x2, [], r2, m)
         | merge (m1 as ((k1, x1)::r1), m2 as ((k2, x2)::r2), m) = (
-	  case Key.compare (k1, k2)
-	   of LESS => mergef (k1, SOME x1, NONE, r1, m2, m)
-	    | EQUAL => mergef (k1, SOME x1, SOME x2, r1, r2, m)
-	    | GREATER => mergef (k2, NONE, SOME x2, m1, r2, m)
-	  (* end case *))
+          case Key.compare (k1, k2)
+           of LESS => mergef (k1, SOME x1, NONE, r1, m2, m)
+            | EQUAL => mergef (k1, SOME x1, SOME x2, r1, r2, m)
+            | GREATER => mergef (k2, NONE, SOME x2, m1, r2, m)
+          (* end case *))
       and mergef (k, x1, x2, r1, r2, m) = (case f (k, x1, x2)
-		                            of NONE => merge (r1, r2, m)
-		                             | SOME y => merge (r1, r2, insert(m, k, y))
-		                          (* end case *))
+                                            of NONE => merge (r1, r2, m)
+                                             | SOME y => merge (r1, r2, insert(m, k, y))
+                                          (* end case *))
   in
       merge (listItemsi m1, listItemsi m2, empty)
   end
