@@ -107,8 +107,8 @@ struct
       in xs :: rotate_lists rest end
 
   fun finally f final =
-      f () before (final ())
-      handle e => (final (); raise e)
+      (f () handle e => (final (); raise e))
+      before (final ())
 
   fun after f g x =
       finally (fn () => f x) (fn () => g x)
