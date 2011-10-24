@@ -46,18 +46,20 @@ struct
 end
 
 signature WORD_ORD_MAP = ORD_MAP where type Key.ord_key = word
+signature INT_ORD_MAP = ORD_MAP where type Key.ord_key = int
 
 (* This is a signature solely to reduce debug spew. *)
 signature MAP_TEST =
 sig
-    structure M : WORD_ORD_MAP
+    structure M : INT_ORD_MAP
     val id : 'a -> 'a
     val rand : unit -> word
-    val numbers : int -> word list
-    val rands : int -> word list
+    val numbers : int -> int list
+    val rands : int -> int list
     val test_adds : M.Key.ord_key list -> string M.map
     val test_lookups : string M.map -> M.Key.ord_key list -> M.Key.ord_key list -> bool
-    val test : ('a -> M.Key.ord_key list) -> 'a -> bool
+    val test2 : ('a -> M.Key.ord_key list) -> ('a -> M.Key.ord_key list) -> 'a -> (M.Key.ord_key list * M.Key.ord_key list) option
+    val test : ('a -> M.Key.ord_key list) -> ('a -> M.Key.ord_key list) -> 'a -> bool
     val test_correctness : unit -> bool
     val time : ('a -> 'b) -> 'a -> IntInf.int
     val test_speed : ('a -> M.Key.ord_key list)
@@ -69,7 +71,7 @@ sig
                               seq:{insert:IntInf.int, lookup:IntInf.int}}
 end
 
-functor MapTestFn (M : WORD_ORD_MAP) : MAP_TEST =
+functor MapTestFn (M : INT_ORD_MAP) : MAP_TEST =
 struct
   structure M = M
   fun id x = x
@@ -77,33 +79,46 @@ struct
   (* mlton seems to have a bug where it raises Fail during codegen when
    * trying to compile this. just hardcode the seed. *)
   val rand = (Word.fromLargeWord o Word31.toLargeWord) o
-             Rand.mkRandom 0wx1badd00d
-(*                 (Word31.fromLargeInt (Time.toMicroseconds (Time.now ())))*)
+             Rand.mkRandom (*0wx1badd00d*)
+                 (Word31.fromLargeInt (Time.toMicroseconds (Time.now ())))
 
+  fun intersect' l1 l2 = List.filter (fn i => not (Util.contains i l2)) l1
 
-  fun numbers n = List.tabulate (n, Word.fromInt)
-  fun rands n = List.tabulate (n, fn _ => rand ())
+  fun numbers n = List.tabulate (n, id)
+  fun rands n = List.tabulate (n, fn _ => Word.toInt (rand () mod 0w20000))
 
-  fun test_adds l = foldl (fn (i, M) => M.insert (M, i, Word.toString i)) M.empty l
+  fun test_adds l = foldl (fn (i, M) => M.insert (M, i, Int.toString i)) M.empty l
+  fun remove' (i, S) = (Util.first (M.remove (S, i)) handle e => S)
+  fun test_removes S l = foldl remove' S l
 
   fun test_lookups M lin lout =
       let
           fun match_in x =
-              case M.find (M, x) of SOME x' => Word.toString x = x'
+              case M.find (M, x) of SOME x' => Int.toString x = x'
                                   | NONE => false
           fun match_out x = not (isSome (M.find (M, x)))
       in
           List.all match_in lin andalso List.all match_out lout
       end
 
-  fun test f n =
+  fun test2 f g n =
       let val l = f n
+          val missing = g n
+          val l' = intersect' l missing
           val M = test_adds l
-      in test_lookups M l [] end
+          val M' = test_removes M missing
+      in if test_lookups M' l' missing then NONE else SOME (l, missing) end
+  fun test f g n =
+      let val l = f n
+          val missing = g n
+          val l' = intersect' l missing
+          val M = test_adds l
+          val M' = test_removes M missing
+      in test_lookups M' l' missing end
 
   fun test_correctness () =
-      let val test_seq = test numbers
-          val test_random = test rands
+      let val test_seq = test numbers rands
+          val test_random = test rands rands
 
           val sizes = [1, 2, 4, 8, 15, 14, 32, 1024, 10000, 100000]
           val seq_results = map test_seq sizes
@@ -137,17 +152,22 @@ struct
   type ord_key = word
   val compare = Word.compare
 end
+structure IntKey =
+struct
+  type ord_key = int
+  val compare = Int.compare
+end
 
-structure SplayMap = SplayMapFn(WordKey)
+structure SplayMap = SplayMapFn(IntKey)
 structure SplayMapTest = MapTestFn(SplayMap)
 
-structure RedBlackMap = RedBlackMapFn(WordKey)
+structure RedBlackMap = RedBlackMapFn(IntKey)
 structure RedBlackMapTest = MapTestFn(RedBlackMap)
 
-structure BinaryMap = BinaryMapFn(WordKey)
+structure BinaryMap = BinaryMapFn(IntKey)
 structure BinaryMapTest = MapTestFn(BinaryMap)
 
-structure IntMapTest = MapTestFn(WordMap)
+structure IntMapTest = MapTestFn(IntMap)
 
 fun test_all n = [SplayMapTest.test_speed_both n,
                   RedBlackMapTest.test_speed_both n,

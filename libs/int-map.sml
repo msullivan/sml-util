@@ -35,7 +35,7 @@ struct
    * so I spent a bunch of time trying to tune it. On my machine running
    * SML/NJ v110.72, it seems that we perform best with the original looping
    * code (even when the other alternatives modify the rest of the map to not
-   * pass around a guess for branchingBit.
+   * pass around a guess for branchingBit).
    * This is in spite of the fact that on pure bit checking tests, the loop version
    * performs quite a bit slower. *)
   fun highestBitLoop (x,m) =
