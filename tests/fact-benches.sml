@@ -9,6 +9,23 @@ struct
     | fact n = n * fact (n-1)
 end
 
+(* Some testing of inlining, based on the most basic implementation *)
+structure FactFun : FACT =
+struct
+  fun mul (n, m) = n * m
+  fun fact 0 = 1
+    | fact n = mul (n, fact (n-1))
+end
+
+structure FactFunCurry : FACT =
+struct
+  fun mul n m = n * m
+  fun fact 0 = 1
+    | fact n = mul n (fact (n-1))
+end
+
+
+
 (* These three all seem to be within epsilon of each other. That is good. *)
 structure FactMatchAcc : FACT =
 struct
@@ -31,6 +48,7 @@ struct
   val fact = fact' 1
 end
 
+(* A bunch more *)
 structure FactUp : FACT =
 struct
   fun fact n =
@@ -57,6 +75,25 @@ struct
   val fact = fact' 1
 end
 
+structure FactCondAccNeq : FACT =
+struct
+  fun fact' m n =
+      if n <> 0
+      then fact' (n*m) (n-1)
+      else m
+  val fact = fact' 1
+end
+
+structure FactCondAccGreater : FACT =
+struct
+  fun fact' m n =
+      if n > 0
+      then fact' (n*m) (n-1)
+      else m
+  val fact = fact' 1
+end
+
+
 structure FactCps : FACT =
 struct
   fun fact' k 0 = k 1
@@ -76,7 +113,6 @@ struct
           fun done   (i, _) = i = n
           fun result (_, m) = m
       in result (for init next done) end
-
 end
 
 structure FactIter2 : FACT =
@@ -160,12 +196,16 @@ struct
       let val () = if F.fact 5 <> 120 then print (name ^ ": anus!\n") else ()
           fun loop1 0 = ()
             | loop1 n = (F.fact m; loop1 (n-1))
-          val iters = 10000000
+          val iters = 20000000
       in time loop1 iters end
   val () = Tests.add Tests.benchmarks test_speed
 end
 
 structure T = TestFun(structure F = FactMatch val name = "match")
+structure T = TestFun(structure F = FactFun val name = "fun")
+structure T = TestFun(structure F = FactFun val name = "fun_curry")
+
+
 structure T = TestFun(structure F = FactMatchAcc val name = "match_acc")
 structure T = TestFun(structure F = FactMatchAccCurry val name = "match_curry")
 structure T = TestFun(structure F = FactMatchAccCurry2
@@ -173,6 +213,8 @@ structure T = TestFun(structure F = FactMatchAccCurry2
 structure T = TestFun(structure F = FactUp val name = "up")
 structure T = TestFun(structure F = FactCond val name = "cond")
 structure T = TestFun(structure F = FactCondAcc val name = "cond_acc")
+structure T = TestFun(structure F = FactCondAccNeq val name = "cond_acc<>")
+structure T = TestFun(structure F = FactCondAccGreater val name = "cond_acc<")
 structure T = TestFun(structure F = FactCps val name = "cps")
 structure T = TestFun(structure F = FactIter val name = "iter")
 structure T = TestFun(structure F = FactIter2 val name = "iter2")
