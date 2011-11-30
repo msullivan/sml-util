@@ -135,8 +135,8 @@ struct
   fun b f g x = f (g x)
   fun c f g x = f x g
   fun y f x   = f (y f) x
-  fun eq (x) y = x = y
-  fun mul (x) y = x * y
+  fun eq x y = x = y
+  fun mul x y = x * y
   fun pred n = n - 1
   fun cond p f g x = if p x then f x else g x
 
@@ -234,6 +234,31 @@ struct
   end
 end
 
+(* Stolen from from SML/NJ lib because I was too
+ * lazy to make a .mlb to import smlnj-lib to test with mlton *)
+fun sort (op > : 'a * 'a -> bool) ls = let 
+    fun merge([],ys) = ys
+      | merge(xs,[]) = xs
+      | merge(x::xs,y::ys) =
+        if x > y then y::merge(x::xs,ys) else x::merge(xs,y::ys)
+    fun mergepairs(ls as [l], k) = ls
+      | mergepairs(l1::l2::ls,k) =
+        if k mod 2 = 1 then l1::l2::ls
+        else mergepairs(merge(l1,l2)::ls, k div 2)
+      | mergepairs _ = raise Fail "ListSort.sort"
+    fun nextrun(run,[])    = (rev run,[])
+      | nextrun(run,x::xs) = if x > hd run then nextrun(x::run,xs)
+                             else (rev run,x::xs)
+    fun samsorting([], ls, k)    = hd(mergepairs(ls,0))
+      | samsorting(x::xs, ls, k) = let 
+            val (run,tail) = nextrun([x],xs)
+        in samsorting(tail, mergepairs(run::ls,k+1), k+1)
+        end
+in 
+    case ls of [] => [] | _ => samsorting(ls, [], 0)
+end
+
+
 (* Right pad a string to a certain length. Always add at least one space. *)
 fun pad n s =
     let fun pad' n s = if String.size s >= n then s else pad' n (s^" ")
@@ -241,11 +266,11 @@ fun pad n s =
 
 fun test n =
     let fun run f = f n
-        val results = map run Tests.benchmarks
-        val is = LargeInt.toString
+        val results = ListPair.zip (Tests.names, map run Tests.benchmarks)
+        val results' = sort (fn ((_, x), (_, y)) => x > y) results
         fun print_test (name, time) =
-            print (pad 14 name ^ is time ^ "\n")
-        val () = ListPair.app print_test (Tests.names, results)
+            print (pad 14 name ^ LargeInt.toString time ^ "\n")
+        val () = app print_test results'
     in () end
 
 val fs = valOf o Int.fromString
