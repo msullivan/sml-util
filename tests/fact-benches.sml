@@ -1,41 +1,39 @@
-structure I = Int
-
 signature FACT =
 sig
-  val fact : I.int -> I.int
+  val fact : int -> int
 end
 
 structure FactMatch : FACT =
 struct
-  fun fact (0 : I.int) = 1 : I.int
+  fun fact 0 = 1
     | fact n = n * fact (n-1)
 end
 
 (* These three all seem to be within epsilon of each other. That is good. *)
 structure FactMatchAcc : FACT =
 struct
-  fun fact' (m, (0 : I.int)) = m : I.int
+  fun fact' (m, 0) = m
     | fact' (m, n) = fact' (n*m, n-1)
   fun fact n = fact' (1, n)
 end
 
 structure FactMatchAccCurry : FACT =
 struct
-  fun fact' m (0 : I.int) = m : I.int
+  fun fact' m 0 = m
     | fact' m n = fact' (n*m) (n-1)
   fun fact n = fact' 1 n
 end
 
 structure FactMatchAccCurry2 : FACT =
 struct
-  fun fact' m (0 : I.int) = m : I.int
+  fun fact' m 0 = m
     | fact' m n = fact' (n*m) (n-1)
   val fact = fact' 1
 end
 
 structure FactUp : FACT =
 struct
-  fun fact (n : I.int) : I.int =
+  fun fact n =
       let fun fact' m i =
               if i <= n then fact' (i*m) (i+1)
               else m
@@ -44,7 +42,7 @@ end
 
 structure FactCond : FACT =
 struct
-  fun fact (n : I.int) =
+  fun fact n =
       if n = 0
       then 1
       else n * fact (n-1)
@@ -52,7 +50,7 @@ end
 
 structure FactCondAcc : FACT =
 struct
-  fun fact' m (n : I.int) =
+  fun fact' m n =
       if n = 0
       then m
       else fact' (n*m) (n-1)
@@ -61,7 +59,7 @@ end
 
 structure FactCps : FACT =
 struct
-  fun fact' k (0 : I.int) = k 1
+  fun fact' k 0 = k 1
     | fact' k n = fact' (k o (fn m => n * m)) (n - 1)
   val fact = fact' (fn x => x)
 end
@@ -72,7 +70,7 @@ struct
       let fun loop x = if done x then x else loop (next x)
       in loop init end
 
-  fun fact (n : I.int) : I.int =
+  fun fact n =
       let val init = (0, 1)
           fun next   (i, m) = (i+1, m * (i+1))
           fun done   (i, _) = i = n
@@ -86,7 +84,7 @@ struct
   fun for init next done =
       if done init then init else for (next init) next done
 
-  fun fact (n : I.int) : I.int =
+  fun fact n =
       let val init = (0, 1)
           fun next   (i, m) = (i+1, m * (i+1))
           fun done   (i, _) = i = n
@@ -101,18 +99,18 @@ struct
   fun b f g x = f (g x)
   fun c f g x = f x g
   fun y f x   = f (y f) x
-  fun eq (x : I.int) y = x = y
-  fun mul (x : I.int) y = x * y
-  fun pred (n : I.int) = n - 1
+  fun eq (x) y = x = y
+  fun mul (x) y = x * y
+  fun pred n = n - 1
   fun cond p f g x = if p x then f x else g x
 
-  val fact : I.int -> I.int =
+  val fact =
       y (b (cond (eq 0) (k 1)) (b (s mul) (c b pred)))
 end
 
 structure FactImp : FACT =
 struct
-  fun fact (n : I.int) : I.int =
+  fun fact n =
       let val ret = ref 1
           val i = ref n
           val () = 
@@ -125,7 +123,7 @@ end
 
 structure FactImp2 : FACT =
 struct
-  fun fact (n : I.int) : I.int =
+  fun fact n =
       let val ret = ref 1
           val i = ref 1
           val () = 
@@ -140,7 +138,7 @@ structure Tests =
 struct
   fun add l x = l := x :: (!l)
   val names : string list ref = ref []
-  val benchmarks : (I.int -> IntInf.int) list ref = ref []
+  val benchmarks : (int -> IntInf.int) list ref = ref []
 end
 
 functor TestFun (structure F : FACT val name : string) =
@@ -208,7 +206,7 @@ fun test n =
         val () = ListPair.app print_test (Tests.names, results)
     in () end
 
-val fs = valOf o I.fromString
+val fs = valOf o Int.fromString
 fun main _ [n] = test (fs n)
   | main _ _ = ()
 
