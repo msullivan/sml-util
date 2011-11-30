@@ -24,6 +24,38 @@ struct
     | fact n = mul n (fact (n-1))
 end
 
+structure FactFun5 : FACT =
+struct
+  fun mul5 (n, m) = n * m
+  fun mul4 nm = mul5 nm
+  fun mul3 nm = mul4 nm
+  fun mul2 nm = mul3 nm
+  fun mul1 nm = mul2 nm
+  fun fact 0 = 1
+    | fact n = mul1 (n, fact (n-1))
+end
+
+structure FactFunInteger : FACT =
+struct
+  fun fact 0 = 1
+    | fact n = Int.* (n, fact (n-1))
+end
+
+signature MULT =
+sig
+  val mul : int * int -> int
+end
+
+structure Mult :> MULT =
+struct
+  fun mul (x, y) = x * y
+end
+
+structure FactFunStruct : FACT =
+struct
+  fun fact 0 = 1
+    | fact n = Mult.mul (n, fact (n-1))
+end
 
 
 (* These three all seem to be within epsilon of each other. That is good. *)
@@ -196,15 +228,18 @@ struct
       let val () = if F.fact 5 <> 120 then print (name ^ ": anus!\n") else ()
           fun loop1 0 = ()
             | loop1 n = (F.fact m; loop1 (n-1))
-          val iters = 20000000
+          val iters = 10000000
+          val _ = loop1 iters
       in time loop1 iters end
   val () = Tests.add Tests.benchmarks test_speed
 end
 
 structure T = TestFun(structure F = FactMatch val name = "match")
 structure T = TestFun(structure F = FactFun val name = "fun")
-structure T = TestFun(structure F = FactFun val name = "fun_curry")
-
+structure T = TestFun(structure F = FactFun5 val name = "fun5")
+structure T = TestFun(structure F = FactFunCurry val name = "fun_curry")
+structure T = TestFun(structure F = FactFunInteger val name = "fun_int")
+structure T = TestFun(structure F = FactFunInteger val name = "fun_struct")
 
 structure T = TestFun(structure F = FactMatchAcc val name = "match_acc")
 structure T = TestFun(structure F = FactMatchAccCurry val name = "match_curry")
