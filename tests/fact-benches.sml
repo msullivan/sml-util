@@ -167,7 +167,7 @@ struct
   fun b f g x = f (g x)
   fun c f g x = f x g
   fun y f x   = f (y f) x
-  fun eq x y = x = y
+  fun eq (x : int) y = x = y
   fun mul x y = x * y
   fun pred n = n - 1
   fun cond p f g x = if p x then f x else g x
