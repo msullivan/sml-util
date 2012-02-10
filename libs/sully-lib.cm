@@ -25,6 +25,11 @@ Library
     structure Print
     signature ANSI
     structure Ansi
+    structure VQLink
+    signature VQ_ELEM
+    signature VARIABLE_QUEUE
+    functor VariableQueueNestable
+    functor VariableQueue
 is
     $/basis.cm
     $/smlnj-lib.cm
@@ -38,4 +43,4 @@ is
     util.sml
     print.sml
     ansi.sml
-
+    variable-queue.sml
