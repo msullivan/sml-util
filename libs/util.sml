@@ -22,6 +22,9 @@ struct
   fun first (x, _) = x
   fun second (_, y) = y
 
+  fun iterate f 0 x = x
+    | iterate f n x = iterate f (n-1) (f x)
+
   fun replicate 0 _ = []
     | replicate n x = x :: (replicate (n - 1) x)
 
