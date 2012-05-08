@@ -97,8 +97,15 @@ struct
               else rev (x1::z) :: loop nil (x2::xs)
       in loop [] end
 
-  fun dedup [] = []
-    | dedup (x::xs) = x :: dedup (List.filter (fn y => not (x = y)) xs)
+  fun dedupBy _ [] = []
+    | dedupBy eq (x::xs) = x :: dedupBy eq (List.filter (fn y => not (eq (x, y))) xs)
+  fun dedup xs = dedupBy (op =) xs
+
+  fun countBy _ [] = []
+    | countBy eq (x::xs) =
+      let val (x_equivs, xs') = List.partition (fn y => eq (x, y)) xs
+      in (1 + length x_equivs, x) :: countBy eq xs' end
+  fun count xs = countBy (op =) xs
 
   fun option z _ NONE = z
     | option _ f (SOME x) = f x
@@ -152,4 +159,7 @@ struct
   fun findIndex y l = findIndexBy (op =) y l
   fun lookupBy f x l = Option.map second (List.find (fn (x', _) => f (x, x')) l)
   fun lookup x l = lookupBy (op =) x l
+
+  fun valOfMsg _ (SOME x) = x
+    | valOfMsg error_msg NONE = raise Fail error_msg
 end

@@ -29,7 +29,7 @@ signature ANSI =
     val reset : string
     val underline : bool -> string
     val bold : bool -> string
-    val buildColor : full_color -> string
+    val fullColor : full_color -> string
     val colorStr : string -> full_color -> string
   end
 
