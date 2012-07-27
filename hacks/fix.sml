@@ -15,9 +15,9 @@ end
 structure RefFix :> FIX =
 struct
   val fix = fn f => let
-      val cell = ref (fn x => raise Fail "owned")
-      val f' = f (fn x => !cell x)
-      val () = cell := f'
+      val cell = ref NONE
+      val f' = f (fn x => valOf (!cell) x)
+      val () = cell := SOME f'
   in f' end
 end
 
