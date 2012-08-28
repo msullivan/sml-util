@@ -127,7 +127,6 @@ struct
   fun xs >>= f = List.concat (map f xs)
 end
 
-
 signature STATE =
 sig
   include MONAD
@@ -176,6 +175,36 @@ struct
       in put s' >>= (fn _ => return x') end))
   fun withState f m = modify f >>= (fn _ => m)
 end
+
+signature ERROR =
+sig
+  type failure
+  datatype 'a error = Success of 'a | Failure of failure
+  include MONAD where type 'a m = 'a error
+end
+
+functor ErrorFn(type t) : ERROR =
+struct
+  type failure = t
+  datatype 'a error = Success of 'a | Failure of failure
+  type 'a m = 'a error
+
+  val return = Success
+  fun m >>= f =
+      (case m of Success x => f x
+               | Failure x => Failure x)
+end
+structure Error = ErrorFn(type t = string)
+
+functor ContFn(type ans) : MONAD =
+struct
+  type 'a m = ('a -> ans) -> ans
+
+  fun return x = fn k => k x
+  fun k >>= f = fn k' =>
+                   k (fn x => f x k')
+end
+
 
 signature IO =
 sig
