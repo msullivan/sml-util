@@ -3,13 +3,7 @@
 (* TODO: maybe have a hierarchy of signatures: Functor, Applicative, Monad *)
 
 (* Infix operators can be nice. *)
-infixr 0 $
-infix 1 >>= >>
-infixr 1 =<< >=> <=<
-infix 4 <$> <*>
-
-(* Useful utility functions *)
-fun f $ x = f x
+infixr 0 $ infix 1 >>= >> infixr 1 =<< >=> <=< infix 4 <$> <*> fun f $ x = f x
 fun id x = x
 
 signature MONAD =
@@ -129,8 +123,8 @@ end
 
 signature STATE =
 sig
-  include MONAD
   type state
+  include MONAD where type 'a m = state -> 'a * state
 
   (* The core functions. *)
   val runState : 'a m -> state -> 'a * state
@@ -176,6 +170,7 @@ struct
   fun withState f m = modify f >>= (fn _ => m)
 end
 
+
 signature ERROR =
 sig
   type failure
@@ -183,9 +178,9 @@ sig
   include MONAD where type 'a m = 'a error
 end
 
-functor ErrorFn(type t) : ERROR =
+functor ErrorFn(type failure) : ERROR =
 struct
-  type failure = t
+  type failure = failure
   datatype 'a error = Success of 'a | Failure of failure
   type 'a m = 'a error
 
@@ -194,7 +189,7 @@ struct
       (case m of Success x => f x
                | Failure x => Failure x)
 end
-structure Error = ErrorFn(type t = string)
+structure Error = ErrorFn(type failure = exn)
 
 functor ContFn(type ans) : MONAD =
 struct
