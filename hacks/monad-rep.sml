@@ -79,7 +79,7 @@ end
 
 structure Universal :> UNIVERSAL =
 struct
-  type u = exn
+  type u = exn (* exn stands for extensible *)
   exception UniversalTypeMismatch
 
   fun embed () =
@@ -97,8 +97,7 @@ struct
 
   structure M = M
   open M
-
-  structure MU = MonadUtil(M) open MU
+  structure MU = MonadUtil(M) open MU (* for <$> *)
 
   fun reflect m = C.shift (fn k => m >>= k)
   fun reify t =
