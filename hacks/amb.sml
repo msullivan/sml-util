@@ -5,6 +5,10 @@ sig
     (* Given a non-deterministic computation, return all possible
      * results. *)
     val collect : (unit -> 'a) -> 'a list
+    (* Given a non-deterministic computation, return the first possible
+     * result, and cut off any other possible results from consideration.
+     * I think this is related to Prolog's cut. *)
+    val collect1 : (unit -> 'a) -> 'a option
 end
 
 structure Amb :> AMB =
@@ -25,6 +29,11 @@ struct
                       amb xs))
        end
 
+   (* run a computation without changing the backtracking points *)
+   fun encapsulate f =
+       let val old = !state
+       in f () before state := old end
+
    (* I got this collect implementation from Joshua Wise. My
     * original one was uglier and relied on the internals of amb. *)
    fun collect f =
@@ -32,6 +41,10 @@ struct
            if amb [true, false]
            then (xs := f () :: !xs; amb []) else rev (!xs)
        end
+
+   fun collect1 f =
+       encapsulate
+           (fn () => if amb [true, false] then SOME (f ()) else NONE)
 
 end
 
