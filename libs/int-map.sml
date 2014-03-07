@@ -74,7 +74,7 @@ struct
     | br (_,_,t,Empty) = t
     | br (p,m,t0,t1) = Br (p,m,t0,t1)
 
-  (* 
+  (*
    * Lf (k,rk,x):
    *   k is the "wordified" key, rk is the "real" key
    * Br (p,m,t0,t1):
@@ -236,6 +236,22 @@ struct
    * case instead of in just the worst case. *)
   fun collate f (m1, m2) = List.collate f (listItems m1, listItems m2)
 
+
+  fun existsi g m =
+      let fun f Empty = false
+            | f (Lf (_, rk, x)) = g (rk, x)
+            | f (Br (_, _, l, r)) = f l orelse f r
+      in f m end
+  fun exists f m = existsi (fn (_,x)=>f x) m
+
+  fun alli g m =
+      let fun f Empty = true
+            | f (Lf (_, rk, x)) = g (rk, x)
+            | f (Br (_, _, l, r)) = f l andalso f r
+      in f m end
+  fun all f m = alli (fn (_,x)=>f x) m
+
+
   (* the following are generic implementations of the intersectWith
    * and mergeWith operetions.  These should be specialized for the internal
    * representations at some point.
@@ -318,7 +334,7 @@ end
 structure IntWordable =
 struct
   type wordable_key = int
-  val imax = 
+  val imax =
       case Int.maxInt of
           NONE => 0w0 (* I have no idea! Fuck! *)
         | SOME w =>(Word.fromInt w)+0w1 (* 0wx40000000 in sml/nj... *)
