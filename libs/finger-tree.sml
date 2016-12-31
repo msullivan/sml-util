@@ -44,6 +44,9 @@ struct
          | Single of 'a
          | Deep of (annot * 'a digit * ('a node) finger_tree * 'a digit)
 
+  datatype 'a view = NilV
+                   | ConsV of 'a * 'a finger_tree
+
   local
       (* SML doesn't *have* polymorphic recursion, so we fake it by
        * doing an Unsafe.cast before recursing. To try to still
@@ -54,8 +57,11 @@ struct
           (('c * 'b -> 'b) -> 'b -> 'c finger_tree -> 'b) = Unsafe.cast f
       fun p_add (f : ('a -> T.annot) -> 'a -> 'a finger_tree -> 'a finger_tree) :
           (('b -> T.annot) -> 'b -> 'b finger_tree -> 'b finger_tree) = Unsafe.cast f
+      fun p_view (f : ('a -> T.annot) -> 'a finger_tree -> 'a view) :
+          (('b -> T.annot) -> 'b finger_tree -> 'b view) = Unsafe.cast f
   in
 
+  (*** Folds ***)
   fun foldr_node f z (Node2 (_, a, b)) = f (a, f (b, z))
     | foldr_node f z (Node3 (_, a, b, c)) = f (a, f (b, f (c, z)))
   fun foldl_node f z (Node2 (_, a, b)) = f (b, f (a, z))
@@ -80,6 +86,11 @@ struct
          in f' (sf, f'' (m, f' (pr, z))) end
     )
 
+  fun toList_f t_foldr x = t_foldr (op ::) [] x
+  fun toList_node t = toList_f foldr_node t
+  fun toList t = toList_f foldr_ftree t
+
+  (*** Measurement lifting ***)
   fun measure_node (Node2 (x, _, _)) = x
     | measure_node (Node3 (x, _, _, _)) = x
   fun measure_finger f l = foldl (fn (x, b) => T.a_plus (f x, b)) T.a_ident l
@@ -87,6 +98,7 @@ struct
     | measure_tree f (Single x) = f x
     | measure_tree _ (Deep (m, _, _, _)) = m
 
+  (*** Smart constructors that handle annots *)
   fun deep f a b c = Deep (T.a_plus (measure_finger f a,
                                      T.a_plus (measure_tree measure_node b,
                                                measure_finger f c)),
@@ -96,6 +108,7 @@ struct
   fun node3 f a b c = Node3 (T.a_plus (f a, T.a_plus (f b, f c)),
                              a, b, c)
 
+  (*** Constructing via cons ***)
   fun fcons_m f a Empty = Single a
     | fcons_m f a (Single b) = deep f [a] Empty [b]
     | fcons_m f a (Deep (_, [b, c, d, e], m, sf)) =
@@ -115,7 +128,38 @@ struct
   fun rcons x t = rcons_m T.measure x t
   fun rcons' (x, t) = rcons x t
 
-  (* TODO: views?? *)
+  fun toTree_f_m t_foldl f x = t_foldl (fn (x, t) => rcons_m f x t) Empty x
+  fun fromList t = toTree_f_m foldl T.measure t
+
+  (*******************)
+  (*** Views on finger trees ***)
+
+  fun viewl_m _ (Empty : 'a finger_tree) = NilV
+    | viewl_m _ (Single x) = ConsV (x, Empty)
+    | viewl_m f (Deep (_, x::xs, m, sf)) = ConsV (x, deep_l f xs m sf)
+    | viewl_m _ _ = raise Fail "finger invariant violated"
+  and deep_l f [] m sf =
+      (case p_view viewl_m measure_node m of
+           NilV => toTree_f_m foldl f sf
+         | ConsV (a, m') => deep f (toList_node a) m' sf)
+    | deep_l f pr m sf = deep f pr m sf
+
+  fun viewl t = viewl_m T.measure t
+
+  fun listEnd ls = let val (x::xs) = rev ls in (x, rev xs) end (* EW *)
+
+  fun viewr_m _ (Empty : 'a finger_tree) = NilV
+    | viewr_m _ (Single x) = ConsV (x, Empty)
+    | viewr_m f (Deep (_, pr, m, sf)) =
+      let val (x, xs) = listEnd sf
+      in ConsV (x, deep_r f pr m xs) end
+  and deep_r f pr m [] =
+      (case p_view viewr_m measure_node m of
+           NilV => toTree_f_m foldl f pr
+         | ConsV (a, m') => deep f pr m' (toList_node a))
+    | deep_r f pr m sf = deep f pr m sf
+
+  fun viewr t = viewr_m T.measure t
 
   (* STUFF *)
   infixr 5 <<
