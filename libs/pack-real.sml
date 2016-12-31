@@ -1,7 +1,7 @@
 (* SML has optional structures in the basis called PackRealLittle and
  * PackRealBig (implementing the PACK_REAL signature) for marshalling and
  * unmarshalling real data. While mlton provides these, SML/NJ does not.
- * This is an implementation of PACK_REAL for SML/NJ built on top of 
+ * This is an implementation of PACK_REAL for SML/NJ built on top of
  * unsafe casting and subscripting. *)
 
 local
@@ -18,11 +18,21 @@ struct
   structure V = Word8Vector
   structure VS = Word8VectorSlice
 
+(*
   fun rawToBytes x =
       let val a : UR.array = Unsafe.cast (RealArray.array (1, x))
       in V.tabulate (bytesPerElem, fn i => UB.sub (a, i)) end
 
   fun rawFromBytes (v : V.vector) = UR.sub (Unsafe.cast v, 0)
+*)
+
+  fun rawToBytes x =
+      let val a = Real64Array.array (8, x) (* LOOOOOL. *)
+      in V.tabulate (bytesPerElem, fn i => A.sub (a, i)) end
+
+  fun rawFromBytes (v : V.vector) =
+      let val a = A.tabulate (V.length v, fn i => V.sub (v, i))
+      in Real64Array.sub (a, 0) end
 
   (* Compare against a known result to determine the system's endianness
    * and swap around byte orders if it differs from our intended endianness. *)
@@ -33,9 +43,9 @@ struct
   val toBytes = swizzle o rawToBytes
   val fromBytes = rawFromBytes o swizzle
 
-  fun subVec (v, i) = 
+  fun subVec (v, i) =
       fromBytes (VS.vector (VS.slice (v, bytesPerElem*i, SOME bytesPerElem)))
-  fun subArr (v, i) = 
+  fun subArr (v, i) =
       fromBytes (AS.vector (AS.slice (v, bytesPerElem*i, SOME bytesPerElem)))
   fun update (v, i, x) = A.copyVec { src = toBytes x, dst = v, di = i*bytesPerElem }
 end
