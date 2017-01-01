@@ -60,6 +60,11 @@ struct
           (('b -> T.annot) -> 'b -> 'b finger_tree -> 'b finger_tree) = Unsafe.cast f
       fun p_view (f : ('a -> T.annot) -> 'a finger_tree -> 'a view) :
           (('b -> T.annot) -> 'b finger_tree -> 'b view) = Unsafe.cast f
+      fun p_app (f : (('a -> T.annot) -> 'a finger_tree -> 'a list -> 'a finger_tree ->
+                      'a finger_tree)) :
+          (('b -> T.annot) -> 'b finger_tree -> 'b list -> 'b finger_tree ->
+           'b finger_tree) = Unsafe.cast f
+
   in
 
   (*** Folds ***)
@@ -132,7 +137,10 @@ struct
   fun rcons x t = rcons_m T.measure x t
   fun rcons' (x, t) = rcons x t
 
-  fun toTree_f_m t_foldl f x = t_foldl (fn (x, t) => rcons_m f x t) Empty x
+  fun rcons_f_m t_foldl f t l = t_foldl (fn (x, t) => rcons_m f x t) t l
+  fun fcons_f_m t_foldr f t l = t_foldr (fn (x, t) => fcons_m f x t) t l
+
+  fun toTree_f_m t_foldl f x = rcons_f_m t_foldl f Empty x
   fun fromList t = toTree_f_m foldl T.measure t
 
   (*******************)
@@ -170,11 +178,33 @@ struct
   fun viewel v = eager_view (viewl v)
   fun viewer v = eager_view (viewr v)
 
+  (*** Concatenation ***)
+  fun nodes f [a, b] = [node2 f a b]
+    | nodes f [a, b, c] = [node3 f a b c]
+    | nodes f [a, b, c, d] = [node2 f a b, node2 f c d]
+    | nodes f (a::b::c::xs) = node3 f a b c :: nodes f xs
+    | nodes _ _ = raise Fail "invariants violated"
+
+  fun app3 f Empty ts xs = fcons_f_m foldr f xs ts
+    | app3 f xs ts Empty = rcons_f_m foldl f xs ts
+    | app3 f (Single x) ts xs = fcons_m f x (app3 f Empty ts xs)
+    | app3 f xs ts (Single x) = rcons_m f x (app3 f xs ts Empty)
+    | app3 f (Deep (_, pr1, m1, sf1)) ts (Deep (_, pr2, m2, sf2)) =
+      deep f pr1
+           (delay
+                (fn _=> p_app app3 measure_node (force m1) (nodes f (sf1 @ ts @ pr2)) (force m2)))
+           sf2
+
+  fun append xs ys = app3 T.measure xs [] ys
+
   (* STUFF *)
-  infixr 5 <<
+  infixr 5 << >< infix 5 >>
+  structure Infix = struct
   fun x << t = fcons x t
-  infix 5 >>
+  fun xs >< ys = append xs ys
   fun t >> x = rcons x t
+  end
+  open Infix
 
   fun forceAll t = (foldl_ftree (fn _ => ()) () t; t)
   (* It really sketches me out that just forcing
