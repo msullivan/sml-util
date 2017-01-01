@@ -9,7 +9,7 @@ sig
     val force : 'a susp -> 'a
 end
 
-structure Lazy :> LAZY =
+structure LazyFn :> LAZY =
 struct
   type 'a susp = (unit -> 'a) ref
 
@@ -27,3 +27,20 @@ struct
 
   fun force susp = (!susp) ()
 end
+
+structure LazyTag : LAZY =
+struct
+  datatype 'a tag = Susp of unit -> 'a | V of 'a
+  datatype 'a susp = L of 'a tag ref
+
+  fun delay f = L (ref (Susp f))
+  fun eager v = L (ref (V v))
+
+  fun force (L (ref (V x))) = x
+    | force (L (r as ref (Susp f))) =
+      let val x = f ()
+          val () = r := V x
+      in x end
+end
+
+structure Lazy = LazyTag
