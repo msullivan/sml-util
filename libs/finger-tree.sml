@@ -65,6 +65,11 @@ struct
           (('b -> T.annot) -> 'b finger_tree -> 'b list -> 'b finger_tree ->
            'b finger_tree) = Unsafe.cast f
 
+      type 'a split_ty = ('a -> T.annot) -> (T.annot -> bool) -> T.annot -> 'a finger_tree
+                         -> 'a finger_tree * 'a * 'a finger_tree
+      fun p_split (f : 'a split_ty) : 'b split_ty = Unsafe.cast f
+
+
   in
 
   (*** Folds ***)
@@ -99,16 +104,16 @@ struct
   (*** Measurement lifting ***)
   fun measure_node (Node2 (x, _, _)) = x
     | measure_node (Node3 (x, _, _, _)) = x
-  fun measure_finger f l = foldl (fn (x, b) => T.a_plus (f x, b)) T.a_ident l
+  fun measure_digit f l = foldl (fn (x, b) => T.a_plus (f x, b)) T.a_ident l
   fun measure_tree f Empty = T.a_ident
     | measure_tree f (Single x) = f x
     | measure_tree _ (Deep (m, _, _, _)) = force m
 
   (*** Smart constructors that handle annots *)
   fun deep f a b c =
-    let val m = delay (fn _ => T.a_plus (measure_finger f a,
+    let val m = delay (fn _ => T.a_plus (measure_digit f a,
                                          T.a_plus (measure_tree measure_node (force b),
-                                                   measure_finger f c)))
+                                                   measure_digit f c)))
     in Deep (m, a, b, c) end
   fun node2 f a b = Node2 (T.a_plus (f a, f b),
                            a, b)
@@ -197,6 +202,45 @@ struct
 
   fun append xs ys = app3 T.measure xs [] ys
 
+  (*** Splitting ***)
+  fun splitDigit f p i [x] = ([], x, [])
+    | splitDigit f p i (x::xs) =
+      let val i' = T.a_plus (i, f x)
+      in
+          if p i' then ([], x, xs) else
+          let val (l, y, r) = splitDigit f p i' xs
+          in (x::l, y, r) end
+      end
+    | splitDigit _ _ _ _ = raise Fail "empty"
+
+  (* XXX: PROBABLY SHOULD MAKE LAZY *)
+  fun splitTree_m f p i (Single x) = (Empty, x, Empty)
+    | splitTree_m f p i (Deep (_, pr, m, sf)) =
+    let val vpr = T.a_plus (i, measure_digit f pr)
+    in if p vpr then let
+           val (l, x, r) = splitDigit f p i pr
+       in (toTree_f_m foldl f l, x, deep_l f r m sf) end
+       else let val vm = T.a_plus (vpr, measure_tree measure_node (force m))
+            in if p vm then let
+                   val (ml, xs, mr) = p_split splitTree_m measure_node p vpr (force m)
+                   val (l, x, r) = splitDigit f p (T.a_plus (vpr, measure_tree measure_node ml))
+                                              (toList_node xs)
+               in (deep_r f pr (eager ml) l, x, deep_l f r (eager mr) sf) end
+               else let val (l, x, r) = splitDigit f p vm sf
+                    in (deep_r f pr m l, x, toTree_f_m foldl f r) end
+            end
+    end
+    | splitTree_m _ _ _ Empty = raise Fail "empty"
+
+  fun splitTree p i t = splitTree_m T.measure p i t
+  fun split p Empty = (Empty, Empty)
+    | split p t =
+      if p (measure_tree T.measure t) then
+          let val (l, x, r) = splitTree p T.a_ident t
+          in (l, fcons x r) end
+      else
+          (t, Empty)
+
   (* STUFF *)
   infixr 5 << >< infix 5 >>
   structure Infix = struct
@@ -216,4 +260,11 @@ struct
 end
 
 structure SimpleFingerTree = FingerTreeFn(TrivialMM)
-structure SizedFingerTree = FingerTreeFn(SizeMM)
+structure SizedFingerTree =
+struct
+  structure F = FingerTreeFn(SizeMM)
+  open F
+
+  fun splitAt i t = split (fn i' => i < i') t
+
+end
