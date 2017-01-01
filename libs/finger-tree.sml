@@ -66,7 +66,7 @@ struct
            'b finger_tree) = Unsafe.cast f
 
       type 'a split_ty = ('a -> T.annot) -> (T.annot -> bool) -> T.annot -> 'a finger_tree
-                         -> 'a finger_tree * 'a * 'a finger_tree
+                         -> 'a finger_tree susp * 'a * 'a finger_tree susp
       fun p_split (f : 'a split_ty) : 'b split_ty = Unsafe.cast f
 
 
@@ -213,21 +213,25 @@ struct
       end
     | splitDigit _ _ _ _ = raise Fail "empty"
 
-  (* XXX: PROBABLY SHOULD MAKE LAZY *)
-  fun splitTree_m f p i (Single x) = (Empty, x, Empty)
+  (* I think making this lazy is probably good >_> *)
+  fun splitTree_m f p i (Single x) = (eager Empty, x, eager Empty)
     | splitTree_m f p i (Deep (_, pr, m, sf)) =
     let val vpr = T.a_plus (i, measure_digit f pr)
     in if p vpr then let
            val (l, x, r) = splitDigit f p i pr
-       in (toTree_f_m foldl f l, x, deep_l f r m sf) end
+       in (delay (fn _=>toTree_f_m foldl f l), x,
+           delay (fn _=>deep_l f r m sf)) end
        else let val vm = T.a_plus (vpr, measure_tree measure_node (force m))
             in if p vm then let
                    val (ml, xs, mr) = p_split splitTree_m measure_node p vpr (force m)
-                   val (l, x, r) = splitDigit f p (T.a_plus (vpr, measure_tree measure_node ml))
+                   val (l, x, r) = splitDigit f p (T.a_plus (vpr,
+                                                             measure_tree measure_node (force ml)))
                                               (toList_node xs)
-               in (deep_r f pr (eager ml) l, x, deep_l f r (eager mr) sf) end
+               in (delay (fn _=>deep_r f pr ml l), x,
+                   delay (fn _=>deep_l f r mr sf)) end
                else let val (l, x, r) = splitDigit f p vm sf
-                    in (deep_r f pr m l, x, toTree_f_m foldl f r) end
+                    in (delay (fn _=>deep_r f pr m l), x,
+                        delay (fn _=>toTree_f_m foldl f r)) end
             end
     end
     | splitTree_m _ _ _ Empty = raise Fail "empty"
@@ -237,7 +241,7 @@ struct
     | split p t =
       if p (measure_tree T.measure t) then
           let val (l, x, r) = splitTree p T.a_ident t
-          in (l, fcons x r) end
+          in (force l, fcons x (force r)) end
       else
           (t, Empty)
 
