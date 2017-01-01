@@ -1,5 +1,10 @@
 (* XXX: This only works in SML/NJ because it uses Unsafe.cast in order
- * to do polymorphic recursion... *)
+ * to do polymorphic recursion...
+ *
+ * It should be possible to rework it to not use polymorphic recursion,
+ * but it would be annoying. *)
+
+(* TODO: This needs to be made to export a reasonable interface *)
 
 signature MEASURABLE_MONOID =
 sig
