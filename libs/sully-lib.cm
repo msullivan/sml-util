@@ -39,7 +39,7 @@ Library
 	functor FingerTreeFn
 	structure SimpleSeq
 	structure IdxSeq
-	functor SortedFingerTree
+	functor FingerTreeMap
 is
     $/basis.cm
     $/smlnj-lib.cm

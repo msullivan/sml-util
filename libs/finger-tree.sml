@@ -8,8 +8,11 @@
  * shenanigans, the amortized constant time bounds hold even when
  * using the tree in a persistent way.
  *
- * This is still in-development testing code. Nothing really has the
- * right interface yet.
+ * This is still in-development testing code.
+ *)
+
+(* To use the infix operations from IdxSeq, do:
+ * infixr 5 << >< infix 5 >> open Infix
  *)
 
 (* The original paper on finger trees makes heavy use of polymorphic
@@ -35,14 +38,9 @@
  * object measurement or the node measurement by inspecting the tag.
  *)
 
-(* To use the infix operations from IdxSeq, do:
- * infixr 5 << >< infix 5 >> open Infix
- *)
 
-(* TODO: Needs cleanup to export a reasonable sequence interface
- * and maybe some other applications also. *)
 
-(* Should I split this into MEASURABLE and MONOID? *)
+(* Should I split this into MEASURABLE and MONOID? Probably not. *)
 signature MEASURABLE_MONOID =
 sig
     type 'a t
@@ -75,6 +73,12 @@ sig
     val fcons' : 'a t * 'a t finger_tree -> 'a t finger_tree
     val rcons : 'a t -> 'a t finger_tree -> 'a t finger_tree
     val rcons' : 'a t * 'a t finger_tree -> 'a t finger_tree
+
+    structure Infix : sig
+        val << : 'a t * 'a t finger_tree -> 'a t finger_tree
+        val >< : 'a t finger_tree * 'a t finger_tree -> 'a t finger_tree
+        val >> : 'a t finger_tree * 'a t -> 'a t finger_tree
+    end
 
     val append : 'a t finger_tree -> 'a t finger_tree -> 'a t finger_tree
 
@@ -345,6 +349,13 @@ struct
     | forceAll t = t
   end
 
+  infixr 5 << >< infix 5 >>
+  structure Infix = struct
+    fun x << t = fcons x t
+    fun xs >< ys = append xs ys
+    fun t >> x = rcons x t
+  end
+
   (* This is kind of gross, but I want it named measure_tree instead
    * of measure but I still want to use measure for elems inside... *)
   val measure = measure_tree
@@ -370,7 +381,7 @@ struct
     fun a_plus (x, y) = x+y
 end
 
-functor KeyMM(type key) : MEASURABLE_MONOID =
+functor KeyMM(type key) (*: MEASURABLE_MONOID*) =
 struct
   type 'a t = key * 'a
   datatype annot = NoKey | Key of key
@@ -389,13 +400,6 @@ sig
     type 'a seq
     include FINGER_TREE where type 'a finger_tree = 'a seq
                           and type 'a t = 'a
-
-
-    structure Infix : sig
-        val << : 'a * 'a seq -> 'a seq
-        val >< : 'a seq * 'a seq -> 'a seq
-        val >> : 'a seq * 'a -> 'a seq
-    end
 
     val split : int -> 'a seq -> 'a seq * 'a seq
     val take : int -> 'a seq -> 'a seq
@@ -416,12 +420,6 @@ struct
   open Susp
   type 'a seq = 'a finger_tree
 
-
-  structure Infix = struct
-    fun x << t = fcons x t
-    fun xs >< ys = append xs ys
-    fun t >> x = rcons x t
-  end
   infixr 5 << >< infix 5 >> open Infix
 
   fun splitLazy3 i t = splitPredLazy3 (fn i' => i < i') t
@@ -462,17 +460,48 @@ struct
   fun insertAt x n s = spliceAt (singleton x) n s
 end
 
-functor SortedFingerTree(K : ORD_KEY) =
+(* This is probably not worth doing... we already have maps *)
+functor FingerTreeMap(K : ORD_KEY) =
 struct
   type key = K.ord_key
 
   local
       structure MM = KeyMM(type key = key)
       structure F = FingerTreeFn(MM)
+      infixr 5 << >< infix 5 >> open F.Infix
+
+      fun search k MM.NoKey = false
+        | search k (MM.Key k') = (K.compare (k, k')) <> GREATER
+      fun split3 t k = F.splitPred3 (search k) t
+      fun splitLazy3 t k = F.splitPredLazy3 (search k) t
+
+      fun eq a b = K.compare (a, b) = EQUAL
   in
 
+  type 'a map = (key * 'a) F.finger_tree
+  val empty = F.empty
 
+  fun look map k =
+    if not (search k (F.measure map)) then NONE else
+    let val (_, (k', v), _) = splitLazy3 map k
+    in if eq k k' then SOME v else NONE end
+
+  fun bind map k v =
+    if not (search k (F.measure map)) then map >> (k, v) else
+    let val (l, (k', v'), r) = split3 map k
+    in
+        if eq k k' then l >< (k, v) << r
+        else l >< (k, v) << (k', v') << r
+    end
+
+  fun insert' ((k, v), map) = bind map k v
+
+  fun addList map entries = foldl insert' map entries
+  fun fromList entries = addList empty entries
+
+  val toList = F.toList
 
   end
 
 end
+structure FTIntMap = FingerTreeMap(struct type ord_key = int val compare = Int.compare end)
