@@ -35,6 +35,10 @@
  * object measurement or the node measurement by inspecting the tag.
  *)
 
+(* To use the infix operations from IdxSeq, do:
+ * infixr 5 << >< infix 5 >> open Infix
+ *)
+
 (* TODO: Needs cleanup to export a reasonable sequence interface
  * and maybe some other applications also. *)
 
@@ -54,8 +58,8 @@ sig
     type 'a finger_tree
     type annot
 
-    datatype 'a view = ConsV of 'a * 'a finger_tree Susp.susp | NilV
-    datatype 'a viewe = ConsEV of 'a * 'a finger_tree | NilEV
+    datatype 'a viewl = ConsLV of 'a * 'a finger_tree Susp.susp | NilLV
+    datatype 'a view = ConsV of 'a * 'a finger_tree | NilV
 
     val measure : 'a t finger_tree -> annot
 
@@ -66,6 +70,7 @@ sig
     val foldr : ('a * 'b -> 'b) -> 'b -> 'a finger_tree -> 'b
 
     val empty : 'a t finger_tree
+    val singleton : 'a t -> 'a t finger_tree
     val fcons : 'a t -> 'a t finger_tree -> 'a t finger_tree
     val fcons' : 'a t * 'a t finger_tree -> 'a t finger_tree
     val rcons : 'a t -> 'a t finger_tree -> 'a t finger_tree
@@ -75,21 +80,19 @@ sig
 
     val viewl : 'a t finger_tree -> 'a t view
     val viewr : 'a t finger_tree -> 'a t view
-    val viewel : 'a t finger_tree -> 'a t viewe
-    val viewer : 'a t finger_tree -> 'a t viewe
+    val viewll : 'a t finger_tree -> 'a t viewl
+    val viewlr : 'a t finger_tree -> 'a t viewl
 
-    val split3 : (annot -> bool) -> 'a t finger_tree
-                 -> 'a t finger_tree Susp.susp * 'a t *
-                    'a t finger_tree Susp.susp
-    val split : (annot -> bool) -> 'a t finger_tree
-                -> 'a t finger_tree * 'a t finger_tree
-
-    (* Hm, maybe we should just include this in a sequence wrapper... *)
-    structure Infix : sig
-        val << : 'a t * 'a t finger_tree -> 'a t finger_tree
-        val >< : 'a t finger_tree * 'a t finger_tree -> 'a t finger_tree
-        val >> : 'a t finger_tree * 'a t -> 'a t finger_tree
-    end
+    exception NotFound
+    val splitPredLazy3 : (annot -> bool) -> 'a t finger_tree
+                         -> 'a t finger_tree Susp.susp * 'a t *
+                            'a t finger_tree Susp.susp
+    val splitPred3 : (annot -> bool) -> 'a t finger_tree
+                     -> 'a t finger_tree * 'a t * 'a t finger_tree
+    val splitPredLazy : (annot -> bool) -> 'a t finger_tree
+                        -> 'a t finger_tree Susp.susp * 'a t finger_tree Susp.susp
+    val splitPred : (annot -> bool) -> 'a t finger_tree
+                    -> 'a t finger_tree * 'a t finger_tree
 
     val forceAll : 'a finger_tree -> 'a finger_tree
 end
@@ -114,10 +117,9 @@ struct
 
   datatype 'a viewi = NilIV
                     | ConsIV of 'a elem * 'a finger_tree Susp.susp
-  datatype 'a view = NilV
-                   | ConsV of 'a * 'a finger_tree Susp.susp
-  datatype 'a viewe = NilEV
-                    | ConsEV of 'a * 'a finger_tree
+  datatype 'a viewl = ConsLV of 'a * 'a finger_tree Susp.susp | NilLV
+  datatype 'a view = ConsV of 'a * 'a finger_tree | NilV
+
   local
       open Susp
       fun unO (O x) = x
@@ -189,9 +191,10 @@ struct
 
   (*** Constructing via cons ***)
   val empty = Empty
+  fun singleton x = Single (O x)
 
   fun fcons_m a Empty = Single a
-    | fcons_m a (Single b) = deep [a] (eager Empty) [b]
+    | fcons_m a (Single b) = deep [a] (eager empty) [b]
     | fcons_m a (Deep (_, [b, c, d, e], m, sf)) =
       (* N.B: eager allegedly fine here according to paper *)
       deep [a, b] (eager (fcons_m (node3 c d e) (force m))) sf
@@ -202,7 +205,7 @@ struct
   fun fcons' (x, t) = fcons x t
 
   fun rcons_m a Empty = Single a
-    | rcons_m a (Single b) = deep [b] (eager Empty) [a]
+    | rcons_m a (Single b) = deep [b] (eager empty) [a]
     | rcons_m a (Deep (_, pr, m, [e, d, c, b])) =
       (* N.B: eager allegedly fine here according to paper *)
       deep pr (eager (rcons_m (node3 e d c) (force m))) [b, a]
@@ -223,7 +226,7 @@ struct
   (*** Views on finger trees ***)
 
   fun viewl_m Empty = NilIV
-    | viewl_m (Single x) = ConsIV (x, eager Empty)
+    | viewl_m (Single x) = ConsIV (x, eager empty)
     | viewl_m (Deep (_, x::xs, m, sf)) = ConsIV (x, delay (fn _=>deep_l xs m sf))
     | viewl_m _ = raise Fail "finger invariant violated"
   and deep_l [] m sf =
@@ -235,7 +238,7 @@ struct
   fun listEnd ls = let val rls = rev ls in (hd rls, rev (tl rls)) end (* EW *)
 
   fun viewr_m Empty = NilIV
-    | viewr_m (Single x) = ConsIV (x, eager Empty)
+    | viewr_m (Single x) = ConsIV (x, eager empty)
     | viewr_m (Deep (_, pr, m, sf)) =
       let val (x, xs) = listEnd sf
       in ConsIV (x, delay (fn _=>deep_r pr m xs)) end
@@ -245,15 +248,15 @@ struct
          | ConsIV (a, m') => deep pr m' (toList_node (unN a)))
     | deep_r pr m sf = deep pr m sf
 
-  fun external_view v = case v of NilIV => NilV
-                                | ConsIV (x, xs) => ConsV (unO x, xs)
-  fun viewl t = external_view (viewl_m t)
-  fun viewr t = external_view (viewr_m t)
+  fun external_view v = case v of NilIV => NilLV
+                                | ConsIV (x, xs) => ConsLV (unO x, xs)
+  fun viewll t = external_view (viewl_m t)
+  fun viewlr t = external_view (viewr_m t)
 
-  fun eager_view v = case v of NilIV => NilEV
-                             | ConsIV (x, xs) => ConsEV (unO x, force xs)
-  fun viewel v = eager_view (viewl_m v)
-  fun viewer v = eager_view (viewr_m v)
+  fun eager_view v = case v of NilIV => NilV
+                             | ConsIV (x, xs) => ConsV (unO x, force xs)
+  fun viewl v = eager_view (viewl_m v)
+  fun viewr v = eager_view (viewr_m v)
 
   (*** Concatenation ***)
   fun nodes [a, b] = [node2 a b]
@@ -285,8 +288,9 @@ struct
       end
     | splitDigit _ _ _ = raise Fail "empty"
 
+  exception NotFound
   (* I think making this lazy is probably good >_> *)
-  fun splitTree_m p i (Single x) = (eager Empty, x, eager Empty)
+  fun splitTree_m p i (Single x) = (eager empty, x, eager empty)
     | splitTree_m p i (Deep (_, pr, m, sf)) =
     let val vpr = T.a_plus (i, measure_digit pr)
     in if p vpr then let
@@ -308,28 +312,31 @@ struct
                         delay (fn _=>toTree_f_m foldl r)) end
             end
     end
-    | splitTree_m _ _ Empty = raise Fail "empty"
+    | splitTree_m _ _ Empty = raise NotFound
 
-  fun split3 p t =
+  fun splitPredLazy3 p t =
     let val (l, x, r) = splitTree_m p T.a_ident t
     in (l, unO x, r) end
 
-  fun split p Empty = (Empty, Empty)
-    | split p t =
+  fun splitPred3 p t =
+    let val (l, x, r) = splitPredLazy3 p t
+    in (force l, x, force r) end
+
+  fun splitPredLazy p Empty = (eager empty, eager empty)
+    | splitPredLazy p t =
       if p (measure_tree t) then
-          let val (l, x, r) = split3 p t
-          in (force l, fcons x (force r)) end
+          let val (l, x, r) = splitPredLazy3 p t
+          in (l, delay (fn _=>fcons x (force r))) end
+      else
+          (eager t, eager empty)
+
+  fun splitPred p Empty = (Empty, Empty)
+    | splitPred p t =
+      if p (measure_tree t) then
+          let val (l, x, r) = splitPred3 p t
+          in (l, fcons x r) end
       else
           (t, Empty)
-
-
-  (* STUFF *)
-  infixr 5 << >< infix 5 >>
-  structure Infix = struct
-    fun x << t = fcons x t
-    fun xs >< ys = append xs ys
-    fun t >> x = rcons x t
-  end
 
   fun forceAll t = (foldl_ftree (fn _ => ()) () t; t)
   (* It really sketches me out that just forcing
@@ -363,12 +370,99 @@ struct
     fun a_plus (x, y) = x+y
 end
 
-structure SimpleFingerTree = FingerTreeFn(TrivialMM)
-structure SizedFingerTree =
+functor KeyMM(type key) : MEASURABLE_MONOID =
+struct
+  type 'a t = key * 'a
+  datatype annot = NoKey | Key of key
+  val a_ident = NoKey
+  fun measure (k, _) = Key k
+  fun a_plus (a, NoKey) = a
+    | a_plus (_, b) = b
+end
+
+structure SimpleSeq = FingerTreeFn(TrivialMM)
+
+
+
+signature IDX_SEQ =
+sig
+    type 'a seq
+    include FINGER_TREE where type 'a finger_tree = 'a seq
+                          and type 'a t = 'a
+
+
+    structure Infix : sig
+        val << : 'a * 'a seq -> 'a seq
+        val >< : 'a seq * 'a seq -> 'a seq
+        val >> : 'a seq * 'a -> 'a seq
+    end
+
+    val split : int -> 'a seq -> 'a seq * 'a seq
+    val take : int -> 'a seq -> 'a seq
+    val drop : int -> 'a seq -> 'a seq
+    val length : 'a seq -> int
+    val nth : int -> 'a seq -> 'a
+    val delete : int -> 'a seq -> 'a seq
+    val spliceAt : 'a seq -> int -> 'a seq -> 'a seq
+    val insertAt : 'a -> int -> 'a seq -> 'a seq
+end
+
+
+
+structure IdxSeq : IDX_SEQ =
 struct
   structure F = FingerTreeFn(SizeMM)
   open F
+  open Susp
+  type 'a seq = 'a finger_tree
 
-  fun splitAt i t = split (fn i' => i < i') t
+
+  structure Infix = struct
+    fun x << t = fcons x t
+    fun xs >< ys = append xs ys
+    fun t >> x = rcons x t
+  end
+  infixr 5 << >< infix 5 >> open Infix
+
+  fun splitLazy3 i t = splitPredLazy3 (fn i' => i < i') t
+  fun split3 i t = splitPred3 (fn i' => i < i') t
+  fun splitLazy i t = splitPredLazy (fn i' => i < i') t
+  fun split i t = splitPred (fn i' => i < i') t
+
+  fun take n s =
+    let val (l, r) = splitLazy n s
+    in force l end
+  fun drop n s =
+    let val (l, r) = splitLazy n s
+    in force r end
+  val length = measure
+
+  (* Many of these could be more efficient... *)
+  fun nth i s =
+    let val (_, x, _) = splitLazy3 i s
+    in x end
+    handle _ => raise Subscript
+
+  fun update x i s =
+    let val (l, _, r) = split3 i s
+    in l >< x << r end
+    handle _ => raise Subscript
+
+  fun delete n s =
+    let val (l, _, r) = split3 n s
+    in l >< r end
+    handle _ => raise Subscript
+  fun spliceAt s' n s =
+    if n < 0 orelse n > length s then raise Subscript else
+    let val (l, r) = split n s
+    in l >< s' >< r end
+  fun insertAt x n s = spliceAt (singleton x) n s
+end
+
+functor SortedFingerTree(K : ORD_KEY) =
+struct
+  type key = K.ord_key
+  structure MM = KeyMM(type key = key)
+
 
 end

@@ -37,8 +37,9 @@ Library
     signature MEASURABLE_MONOID
     signature FINGER_TREE
 	functor FingerTreeFn
-	structure SimpleFingerTree
-	structure SizedFingerTree
+	structure SimpleSeq
+	structure IdxSeq
+	functor SortedFingerTree
 is
     $/basis.cm
     $/smlnj-lib.cm
