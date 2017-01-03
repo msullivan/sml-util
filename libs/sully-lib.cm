@@ -30,6 +30,15 @@ Library
     signature VARIABLE_QUEUE
     functor VariableQueueNestable
     functor VariableQueue
+
+    signature LAZY
+	structure Susp
+
+    signature MEASURABLE_MONOID
+    signature FINGER_TREE
+	functor FingerTreeFn
+	structure SimpleFingerTree
+	structure SizedFingerTree
 is
     $/basis.cm
     $/smlnj-lib.cm
@@ -44,3 +53,6 @@ is
     print.sml
     ansi.sml
     variable-queue.sml
+
+    lazy.sml
+    finger-tree.sml

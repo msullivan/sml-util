@@ -43,4 +43,4 @@ struct
       in x end
 end
 
-structure Lazy = LazyTag
+structure Susp = LazyTag

@@ -35,37 +35,66 @@
  * object measurement or the node measurement by inspecting the tag.
  *)
 
-(* TODO: This needs to be made to export a reasonable interface *)
+(* TODO: Needs cleanup to export a reasonable sequence interface
+ * and maybe some other applications also. *)
 
-(* Should I split these? *)
+(* Should I split this into MEASURABLE and MONOID? *)
 signature MEASURABLE_MONOID =
 sig
     type 'a t
-    type annot (* XXX: polymorphic?? *)
+    type annot
     val measure : 'a t -> annot
     val a_ident : annot
     val a_plus : annot * annot -> annot
 end
 
-structure TrivialMM : MEASURABLE_MONOID =
-struct
-    type 'a t = 'a
-    type annot = unit
-    val a_ident = ()
-    fun measure _ = a_ident
-    fun a_plus (_, _) = a_ident
+signature FINGER_TREE =
+sig
+    type 'a t
+    type 'a finger_tree
+    type annot
+
+    datatype 'a view = ConsV of 'a * 'a finger_tree Susp.susp | NilV
+    datatype 'a viewe = ConsEV of 'a * 'a finger_tree | NilEV
+
+    val measure : 'a t finger_tree -> annot
+
+    val toList : 'a finger_tree -> 'a list
+    val fromList : 'a t list -> 'a t finger_tree
+
+    val foldl : ('a * 'b -> 'b) -> 'b -> 'a finger_tree -> 'b
+    val foldr : ('a * 'b -> 'b) -> 'b -> 'a finger_tree -> 'b
+
+    val empty : 'a t finger_tree
+    val fcons : 'a t -> 'a t finger_tree -> 'a t finger_tree
+    val fcons' : 'a t * 'a t finger_tree -> 'a t finger_tree
+    val rcons : 'a t -> 'a t finger_tree -> 'a t finger_tree
+    val rcons' : 'a t * 'a t finger_tree -> 'a t finger_tree
+
+    val append : 'a t finger_tree -> 'a t finger_tree -> 'a t finger_tree
+
+    val viewl : 'a t finger_tree -> 'a t view
+    val viewr : 'a t finger_tree -> 'a t view
+    val viewel : 'a t finger_tree -> 'a t viewe
+    val viewer : 'a t finger_tree -> 'a t viewe
+
+    val split3 : (annot -> bool) -> 'a t finger_tree
+                 -> 'a t finger_tree Susp.susp * 'a t *
+                    'a t finger_tree Susp.susp
+    val split : (annot -> bool) -> 'a t finger_tree
+                -> 'a t finger_tree * 'a t finger_tree
+
+    (* Hm, maybe we should just include this in a sequence wrapper... *)
+    structure Infix : sig
+        val << : 'a t * 'a t finger_tree -> 'a t finger_tree
+        val >< : 'a t finger_tree * 'a t finger_tree -> 'a t finger_tree
+        val >> : 'a t finger_tree * 'a t -> 'a t finger_tree
+    end
+
+    val forceAll : 'a finger_tree -> 'a finger_tree
 end
 
-structure SizeMM : MEASURABLE_MONOID =
-struct
-    type 'a t = 'a
-    type annot = int
-    val a_ident = 0
-    fun measure _ = 1
-    fun a_plus (x, y) = x+y
-end
-
-functor FingerTreeFn(T : MEASURABLE_MONOID) =
+functor FingerTreeFn(T : MEASURABLE_MONOID) : FINGER_TREE =
 struct
   type 'a t = 'a T.t
   type annot = T.annot
@@ -73,22 +102,24 @@ struct
   datatype 'a node = Node2 of (annot * 'a * 'a) | Node3 of (annot * 'a * 'a * 'a)
   datatype 'a elem = O of 'a
                    | N of 'a elem node
+  (* Things could be made more efficient by having a datatype with
+   * the 1-4 digit options but that sounds a lot less pleasant. *)
   type 'a digit = 'a list
 
   datatype 'a finger_tree =
            Empty
          | Single of 'a elem
-         | Deep of (annot Lazy.susp *
-                    'a elem digit * 'a (*node*) finger_tree Lazy.susp * 'a elem digit)
+         | Deep of (annot Susp.susp *
+                    'a elem digit * 'a (*node*) finger_tree Susp.susp * 'a elem digit)
 
   datatype 'a viewi = NilIV
-                    | ConsIV of 'a elem * 'a finger_tree Lazy.susp
+                    | ConsIV of 'a elem * 'a finger_tree Susp.susp
   datatype 'a view = NilV
-                   | ConsV of 'a * 'a finger_tree Lazy.susp
+                   | ConsV of 'a * 'a finger_tree Susp.susp
   datatype 'a viewe = NilEV
                     | ConsEV of 'a * 'a finger_tree
   local
-      open Lazy
+      open Susp
       fun unO (O x) = x
         | unO _ = raise Fail "fingertree invariants broken"
       fun unN (N x) = x
@@ -157,6 +188,8 @@ struct
                                 a, b, c))
 
   (*** Constructing via cons ***)
+  val empty = Empty
+
   fun fcons_m a Empty = Single a
     | fcons_m a (Single b) = deep [a] (eager Empty) [b]
     | fcons_m a (Deep (_, [b, c, d, e], m, sf)) =
@@ -214,14 +247,13 @@ struct
 
   fun external_view v = case v of NilIV => NilV
                                 | ConsIV (x, xs) => ConsV (unO x, xs)
-
   fun viewl t = external_view (viewl_m t)
   fun viewr t = external_view (viewr_m t)
 
-  fun eager_view v = case v of NilV => NilEV
-                             | ConsV (x, xs) => ConsEV (x, force xs)
-  fun viewel v = eager_view (viewl v)
-  fun viewer v = eager_view (viewr v)
+  fun eager_view v = case v of NilIV => NilEV
+                             | ConsIV (x, xs) => ConsEV (unO x, force xs)
+  fun viewel v = eager_view (viewl_m v)
+  fun viewer v = eager_view (viewr_m v)
 
   (*** Concatenation ***)
   fun nodes [a, b] = [node2 a b]
@@ -278,14 +310,14 @@ struct
     end
     | splitTree_m _ _ Empty = raise Fail "empty"
 
-  fun splitTree p i t =
-    let val (l, x, r) = splitTree_m p i t
+  fun split3 p t =
+    let val (l, x, r) = splitTree_m p T.a_ident t
     in (l, unO x, r) end
 
   fun split p Empty = (Empty, Empty)
     | split p t =
       if p (measure_tree t) then
-          let val (l, x, r) = splitTree p T.a_ident t
+          let val (l, x, r) = split3 p t
           in (force l, fcons x (force r)) end
       else
           (t, Empty)
@@ -294,11 +326,10 @@ struct
   (* STUFF *)
   infixr 5 << >< infix 5 >>
   structure Infix = struct
-  fun x << t = fcons x t
-  fun xs >< ys = append xs ys
-  fun t >> x = rcons x t
+    fun x << t = fcons x t
+    fun xs >< ys = append xs ys
+    fun t >> x = rcons x t
   end
-  open Infix
 
   fun forceAll t = (foldl_ftree (fn _ => ()) () t; t)
   (* It really sketches me out that just forcing
@@ -306,6 +337,30 @@ struct
   fun forceAll (t as Deep (m, _, _, _)) = (force m; t)
     | forceAll t = t
   end
+
+  (* This is kind of gross, but I want it named measure_tree instead
+   * of measure but I still want to use measure for elems inside... *)
+  val measure = measure_tree
+  val foldl = foldl_ftree
+  val foldr = foldr_ftree
+end
+
+structure TrivialMM : MEASURABLE_MONOID =
+struct
+    type 'a t = 'a
+    type annot = unit
+    val a_ident = ()
+    fun measure _ = a_ident
+    fun a_plus (_, _) = a_ident
+end
+
+structure SizeMM : MEASURABLE_MONOID =
+struct
+    type 'a t = 'a
+    type annot = int
+    val a_ident = 0
+    fun measure _ = 1
+    fun a_plus (x, y) = x+y
 end
 
 structure SimpleFingerTree = FingerTreeFn(TrivialMM)
