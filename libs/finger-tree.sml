@@ -12,7 +12,7 @@
  *)
 
 (* To use the infix operations from IdxSeq, do:
- * infixr 5 << >< infix 5 >> open Infix
+ * infixr 5 << >< infix 5 >> open IdxSeq.Infix
  *)
 
 (* The original paper on finger trees makes heavy use of polymorphic
@@ -406,7 +406,7 @@ sig
     val drop : int -> 'a seq -> 'a seq
     val length : 'a seq -> int
     val nth : int -> 'a seq -> 'a
-    val delete : int -> 'a seq -> 'a seq
+    val deleteAt : int -> 'a seq -> 'a seq
     val spliceAt : 'a seq -> int -> 'a seq -> 'a seq
     val insertAt : 'a -> int -> 'a seq -> 'a seq
     val update : 'a -> int -> 'a seq -> 'a seq
@@ -449,7 +449,7 @@ struct
     in l >< x << r end
     handle _ => raise Subscript
 
-  fun delete n s =
+  fun deleteAt n s =
     let val (l, _, r) = split3 n s
     in l >< r end
     handle _ => raise Subscript
@@ -460,8 +460,10 @@ struct
   fun insertAt x n s = spliceAt (singleton x) n s
 end
 
+(* This is exactly ORD_KEY but without me needing to get mlton to know *)
+signature KEY = sig type ord_key val compare : ord_key * ord_key -> order end
 (* This is probably not worth doing... we already have maps *)
-functor FingerTreeMap(K : ORD_KEY) =
+functor FingerTreeMap(K : KEY) =
 struct
   type key = K.ord_key
 

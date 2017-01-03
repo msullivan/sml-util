@@ -43,4 +43,13 @@ struct
       in x end
 end
 
+structure LazyNot :> LAZY =
+struct
+  type 'a susp = 'a
+
+  fun delay f = f ()
+  fun eager v = v
+  fun force susp = susp
+end
+
 structure Susp = LazyTag
