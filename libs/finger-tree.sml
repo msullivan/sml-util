@@ -405,9 +405,9 @@ sig
     val delete : int -> 'a seq -> 'a seq
     val spliceAt : 'a seq -> int -> 'a seq -> 'a seq
     val insertAt : 'a -> int -> 'a seq -> 'a seq
+    val update : 'a -> int -> 'a seq -> 'a seq
+    val subseq : int -> int -> 'a seq -> 'a seq
 end
-
-
 
 structure IdxSeq : IDX_SEQ =
 struct
@@ -429,13 +429,16 @@ struct
   fun splitLazy i t = splitPredLazy (fn i' => i < i') t
   fun split i t = splitPred (fn i' => i < i') t
 
+  val length = measure
+
   fun take n s =
     let val (l, r) = splitLazy n s
     in force l end
   fun drop n s =
     let val (l, r) = splitLazy n s
     in force r end
-  val length = measure
+
+  fun subseq from to s = take (to-from) (drop from s)
 
   (* Many of these could be more efficient... *)
   fun nth i s =
@@ -462,7 +465,14 @@ end
 functor SortedFingerTree(K : ORD_KEY) =
 struct
   type key = K.ord_key
-  structure MM = KeyMM(type key = key)
 
+  local
+      structure MM = KeyMM(type key = key)
+      structure F = FingerTreeFn(MM)
+  in
+
+
+
+  end
 
 end
