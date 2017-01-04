@@ -43,7 +43,7 @@ struct
       in x end
 end
 
-structure LazyNot :> LAZY =
+structure LazyNot : LAZY =
 struct
   type 'a susp = 'a
 
@@ -52,4 +52,4 @@ struct
   fun force susp = susp
 end
 
-structure Susp = LazyTag
+structure Susp = LazyNot
