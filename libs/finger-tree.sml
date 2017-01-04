@@ -208,13 +208,21 @@ struct
   fun fcons x t = fcons_m (O x) t
   fun fcons' (x, t) = fcons x t
 
+  (* Hacky specialization of list append for our short lists *)
+  fun listAdd [a, b, c] d = [a, b, c, d]
+    | listAdd [a, b] c = [a, b, c]
+    | listAdd [a] b = [a, b]
+    | listAdd [] a = [a]
+    | listAdd _ _ = raise Fail "lol"
+
+
   fun rcons_m a Empty = Single a
     | rcons_m a (Single b) = deep [b] (eager empty) [a]
     | rcons_m a (Deep (_, pr, m, [e, d, c, b])) =
       (* N.B: eager allegedly fine here according to paper *)
       deep pr (eager (rcons_m (node3 e d c) (force m))) [b, a]
     | rcons_m a (Deep (_, pr, m, sf)) =
-      deep pr m (sf @ [a])
+      deep pr m (listAdd sf a)
 
   fun rcons x t = rcons_m (O x) t
   fun rcons' (x, t) = rcons x t
@@ -239,7 +247,12 @@ struct
          | ConsIV (a, m') => deep (toList_node (unN a)) m' sf)
     | deep_l pr m sf = deep pr m sf
 
-  fun listEnd ls = let val rls = rev ls in (hd rls, rev (tl rls)) end (* EW *)
+  (* This winds up being a decent optimization *)
+  fun listEnd [a, b, c, d] = (d, [a, b, c])
+    | listEnd [a, b, c] = (c, [a, b])
+    | listEnd [a, b] = (b, [a])
+    | listEnd [a] = (a, [])
+    | listEnd _ = raise Fail "lol"
 
   fun viewr_m Empty = NilIV
     | viewr_m (Single x) = ConsIV (x, eager empty)
