@@ -34,4 +34,16 @@ struct
 
 end;
 
+structure DecompressionTest =
+struct
+  infixr 5 << >< infix 5 >> open IdxSeq.Infix
+  infixr 0 $ fun f $ x = f x
+
+  structure S = IdxSeq
+
+
+end
+
+(*
 JosephusTest.run ();
+*)

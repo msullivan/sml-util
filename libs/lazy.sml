@@ -43,6 +43,21 @@ struct
       in x end
 end
 
+structure LazyTagLol : LAZY =
+struct
+  datatype 'a tag = Susp of unit -> 'a | V of 'a
+  datatype 'a susp = L of 'a tag ref
+
+  fun eager v = L (ref (V v))
+  fun delay f = eager (f ())
+
+  fun force (L (ref (V x))) = x
+    | force (L (r as ref (Susp f))) =
+      let val x = f ()
+          val () = r := V x
+      in x end
+end
+
 structure LazyNot : LAZY =
 struct
   type 'a susp = 'a
@@ -52,4 +67,4 @@ struct
   fun force susp = susp
 end
 
-structure Susp = LazyNot
+structure Susp = LazyTag

@@ -331,13 +331,40 @@ struct
     end
     | splitTree_m _ _ Empty = raise NotFound
 
+  fun splitTree_m' p i (Single x) = (empty, x, empty)
+    | splitTree_m' p i (Deep (_, pr, m, sf)) =
+    let val vpr = T.a_plus (i, measure_digit pr)
+    in if p vpr then let
+           val (l, x, r) = splitDigit p i pr
+       in (toTree_f_m foldr l, x, deep_l r m sf) end
+       else let val vm = T.a_plus (vpr, measure_tree (force m))
+            in if p vm then let
+                   val (ml, xs, mr) = splitTree_m' p vpr (force m)
+                   val xs = unN xs
+                   val (l, x, r) = splitDigit p (T.a_plus (vpr,
+                                                             measure_tree ml))
+                                              (toList_node xs)
+               in (deep_r pr (eager ml) l, x, deep_l r (eager mr) sf) end
+
+               else let val (l, x, r) = splitDigit p vm sf
+                    in (deep_r pr m l, x, toTree_f_m foldr r) end
+            end
+    end
+    | splitTree_m' _ _ Empty = raise NotFound
+
+
   fun splitPredLazy3 p t =
     let val (l, x, r) = splitTree_m p T.a_ident t
     in (l, unO x, r) end
 
   fun splitPred3 p t =
+    let val (l, x, r) = splitTree_m' p T.a_ident t
+    in (l, unO x, r) end
+(*
+  fun splitPred3 p t =
     let val (l, x, r) = splitPredLazy3 p t
     in (force l, x, force r) end
+*)
 
   fun splitPredLazy p Empty = (eager empty, eager empty)
     | splitPredLazy p t =
