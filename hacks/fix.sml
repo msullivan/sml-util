@@ -25,10 +25,11 @@ end
 structure RecFix :> FIX =
 struct
   datatype 'a urec = Rec of 'a urec -> 'a
+  fun unRec (Rec x) = x
 
   val fix = fn f => let
-      val f' = fn (Rec x) => f (fn z => (x (Rec x)) z)
-  in f' (Rec f') end
+      val f' = Rec (fn x => f (fn z => unRec x x z))
+  in unRec f' f' end
 end
 
 (* Fix based on exceptions *)
@@ -47,8 +48,9 @@ struct
   (* This is basically the same as the recursive type one *)
   val fix = fn f => let
       exception Rec of exn -> ('a -> 'b)
-      val f' = fn (Rec x) => f (fn z => (x (Rec x)) z)
-  in f' (Rec f') end
+      fun unRec (Rec x) = x
+      val f' = Rec (fn x => f (fn z => unRec x x z))
+  in unRec f' f' end
 end
 
 (* Mutual recursion fix point! *)
@@ -90,4 +92,3 @@ structure ExceptionTest = FixTest(structure Fix = ExceptionFix)
 val n4 = ExceptionTest.fact 10
 structure ExnTest = FixTest(structure Fix = ExnFix)
 val n5 = ExnTest.fact 10
-
