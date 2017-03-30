@@ -1,17 +1,20 @@
-
+(* A test of recursive sets inspired by one of the puzzles in the 2006
+ * ICFP programming contest, which featured an adventure game where
+ * items could be viewed as propositions in a logic in which implication
+ * was from a set of props to another prop. *)
 structure RecSetTest =
 struct
-  type name = string
-  fun name_compare (n1, n2) = String.compare (n1, n2)
-
   structure SetCore = BinarySetCore (*****)
 
   (* Propositions are either atomic or an implication from a set
-   * props to a prop *)
-  datatype Prop = Atom of name
+   * props to a prop.
+   * A ::= P
+   *     | {A, ..., A} -o A
+   *)
+  datatype Prop = Atom of string
                 | Imp of Prop SetCore.set * Prop
 
-  fun prop_compare (Atom n1, Atom n2) = name_compare (n1, n2)
+  fun prop_compare (Atom n1, Atom n2) = String.compare (n1, n2)
     | prop_compare (Imp (ps, p), Imp (qs, q)) =
       (case SetCore.compare prop_compare (ps, qs) of
            EQUAL => prop_compare (p, q)
