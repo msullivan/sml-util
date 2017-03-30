@@ -8,14 +8,27 @@
  * representation.
  *)
 
-functor ListSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_key =
+structure ListSetCore =
+struct
+    (* sets are represented as ordered lists of key values *)
+    type 'a set = 'a list
+    fun compare _ ([], []) = EQUAL
+      | compare _ ([], _) = LESS
+      | compare _ (_, []) = GREATER
+      | compare key_cmp (x1::r1, x2::r2) = (case key_cmp (x1, x2)
+	   of EQUAL => compare key_cmp  (r1, r2)
+	    | order => order
+	  (* end case *))
+end
+
+functor ListSetRecFn (K : ORD_KEY) : ORD_SET where type Key.ord_key = K.ord_key =
   struct
 
     structure Key = K
 
-  (* sets are represented as ordered lists of key values *)
     type item = Key.ord_key
     type set = item list
+    val compare = ListSetCore.compare Key.compare
 
     val empty = []
 
@@ -144,14 +157,6 @@ functor ListSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_key =
 	    f (s1, s2)
 	  end
 
-    fun compare ([], []) = EQUAL
-      | compare ([], _) = LESS
-      | compare (_, []) = GREATER
-      | compare (x1::r1, x2::r2) = (case Key.compare(x1, x2)
-	   of EQUAL => compare (r1, r2)
-	    | order => order
-	  (* end case *))
-
   (* Return true if and only if the first set is a subset of the second *)
     fun isSubset (s1, s2) = let
 	  fun f ([], _) = true
@@ -183,3 +188,10 @@ functor ListSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_key =
 
   end (* IntListMap *)
 
+structure ListSetCore : SET_CORE = ListSetCore
+
+functor ListSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_key =
+struct
+  structure S = ListSetRecFn(K)
+  open S
+end

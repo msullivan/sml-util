@@ -1,3 +1,6 @@
+(* Modification of BinarySetFn to be able to hold elements that
+ * contain sets themselves. *)
+
 (* binary-set-fn.sml
  *
  * COPYRIGHT (c) 1993 by AT&T Bell Laboratories.  See COPYRIGHT file for details.
@@ -60,21 +63,53 @@
  *   Modified to functor to support general ordered values
  *)
 
-functor BinarySetFn (K : ORD_KEY) : ORD_SET =
-  struct
+structure BinarySetCore =
+struct
+    (* The set and compare are moved from the core BinarySetFn and made
+     * polymorphic. *)
+    datatype 'a set
+      = E
+      | T of {
+	      elt : 'a,
+          cnt : int,
+          left : 'a set,
+          right : 'a set
+	}
 
+    local
+      fun next ((t as T{right, ...})::rest) = (t, left(right, rest))
+	| next _ = (E, [])
+      and left (E, rest) = rest
+	| left (t as T{left=l, ...}, rest) = left(l, t::rest)
+    in
+    fun compare key_cmp (s1, s2) = let
+	  fun cmp (t1, t2) = (case (next t1, next t2)
+		 of ((E, _), (E, _)) => EQUAL
+		  | ((E, _), _) => LESS
+		  | (_, (E, _)) => GREATER
+		  | ((T{elt=e1, ...}, r1), (T{elt=e2, ...}, r2)) => (
+		      case key_cmp(e1, e2)
+		       of EQUAL => cmp (r1, r2)
+			| order => order
+		      (* end case *))
+		(* end case *))
+	  in
+	    cmp (left(s1, []), left(s2, []))
+	  end
+    end
+
+
+
+end
+
+functor BinarySetRecFn (K : ORD_KEY) : ORD_SET =
+  struct
     structure Key = K
 
     type item = K.ord_key
-
-    datatype set
-      = E
-      | T of {
-	  elt : item,
-          cnt : int,
-          left : set,
-          right : set
-	}
+    open BinarySetCore
+    type set = item set
+    val compare = compare K.compare
 
     fun numItems E = 0
       | numItems (T{cnt,...}) = cnt
@@ -309,28 +344,6 @@ functor BinarySetFn (K : ORD_KEY) : ORD_SET =
       | equal _ = false
     end
 
-    local
-      fun next ((t as T{right, ...})::rest) = (t, left(right, rest))
-	| next _ = (E, [])
-      and left (E, rest) = rest
-	| left (t as T{left=l, ...}, rest) = left(l, t::rest)
-    in
-    fun compare (s1, s2) = let
-	  fun cmp (t1, t2) = (case (next t1, next t2)
-		 of ((E, _), (E, _)) => EQUAL
-		  | ((E, _), _) => LESS
-		  | (_, (E, _)) => GREATER
-		  | ((T{elt=e1, ...}, r1), (T{elt=e2, ...}, r2)) => (
-		      case Key.compare(e1, e2)
-		       of EQUAL => cmp (r1, r2)
-			| order => order
-		      (* end case *))
-		(* end case *))
-	  in
-	    cmp (left(s1, []), left(s2, []))
-	  end
-    end
-
     fun delete (E,x) = raise LibBase.NotFound
       | delete (set as T{elt=v,left=l,right=r,...},x) =
           case K.compare(x,v) of
@@ -431,3 +444,11 @@ functor BinarySetFn (K : ORD_KEY) : ORD_SET =
 	  (* end case *))
 
   end (* BinarySetFn *)
+
+structure BinarySetCore : SET_CORE = BinarySetCore
+
+functor BinarySetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_key =
+struct
+  structure S = BinarySetRecFn(K)
+  open S
+end

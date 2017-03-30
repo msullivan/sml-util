@@ -1,3 +1,6 @@
+(* Modification of SplaySetFn to be able to hold elements that
+ * contain sets themselves. *)
+
 (* splay-set-fn.sml
  *
  * COPYRIGHT (c) 1993 by AT&T Bell Laboratories.  See COPYRIGHT file for details.
@@ -6,19 +9,53 @@
  *
  *)
 
-functor SplaySetFn (K : ORD_KEY) : ORD_SET =
-  struct
-    structure Key = K
+structure SplaySetCore =
+struct
+    (* The set and compare are moved from the core SplaySetFn and made
+     * polymorphic. *)
     open SplayTree
-
-    type item = K.ord_key
-
-    datatype set =
+    datatype 'a set =
         EMPTY
       | SET of {
-        root : item splay ref,
+        root : 'a splay ref,
         nobj : int
       }
+
+    local
+      fun next ((t as SplayObj{right, ...})::rest) = (t, left(right, rest))
+	| next _ = (SplayNil, [])
+      and left (SplayNil, rest) = rest
+	| left (t as SplayObj{left=l, ...}, rest) = left(l, t::rest)
+    in
+    fun compare _ (EMPTY, EMPTY) = EQUAL
+      | compare _ (EMPTY, _) = LESS
+      | compare _ (_, EMPTY) = GREATER
+      | compare key_cmp (SET{root=s1, ...}, SET{root=s2, ...}) = let
+	  fun cmp (t1, t2) = (case (next t1, next t2)
+		 of ((SplayNil, _), (SplayNil, _)) => EQUAL
+		  | ((SplayNil, _), _) => LESS
+		  | (_, (SplayNil, _)) => GREATER
+		  | ((SplayObj{value=e1, ...}, r1), (SplayObj{value=e2, ...}, r2)) => (
+		      case key_cmp(e1, e2)
+		       of EQUAL => cmp (r1, r2)
+			| order => order
+		      (* end case *))
+		(* end case *))
+	  in
+	    cmp (left(!s1, []), left(!s2, []))
+	  end
+    end (* local *)
+
+end
+
+functor SplaySetRecFn (K : ORD_KEY) : ORD_SET =
+  struct
+    structure Key = K
+
+    type item = K.ord_key
+    open SplaySetCore
+    type set = item set
+    val compare = compare K.compare
 
     fun cmpf k = fn k' => K.compare(k',k)
 
@@ -125,31 +162,6 @@ functor SplaySetFn (K : ORD_KEY) : ORD_SET =
       | isSubset (EMPTY,_) = true
       | isSubset _ = false
     end
-
-    local
-      fun next ((t as SplayObj{right, ...})::rest) = (t, left(right, rest))
-	| next _ = (SplayNil, [])
-      and left (SplayNil, rest) = rest
-	| left (t as SplayObj{left=l, ...}, rest) = left(l, t::rest)
-    in
-    fun compare (EMPTY, EMPTY) = EQUAL
-      | compare (EMPTY, _) = LESS
-      | compare (_, EMPTY) = GREATER
-      | compare (SET{root=s1, ...}, SET{root=s2, ...}) = let
-	  fun cmp (t1, t2) = (case (next t1, next t2)
-		 of ((SplayNil, _), (SplayNil, _)) => EQUAL
-		  | ((SplayNil, _), _) => LESS
-		  | (_, (SplayNil, _)) => GREATER
-		  | ((SplayObj{value=e1, ...}, r1), (SplayObj{value=e2, ...}, r2)) => (
-		      case Key.compare(e1, e2)
-		       of EQUAL => cmp (r1, r2)
-			| order => order
-		      (* end case *))
-		(* end case *))
-	  in
-	    cmp (left(!s1, []), left(!s2, []))
-	  end
-    end (* local *)
 
 	(* Return the number of items in the table *)
     fun numItems EMPTY = 0
@@ -349,3 +361,11 @@ functor SplaySetFn (K : ORD_KEY) : ORD_SET =
           end
 
   end (* SplaySet *)
+
+structure SplaySetCore : SET_CORE = SplaySetCore
+
+functor SplaySetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_key =
+struct
+  structure S = SplaySetRecFn(K)
+  open S
+end

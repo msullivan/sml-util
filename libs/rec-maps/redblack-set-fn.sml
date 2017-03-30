@@ -1,3 +1,6 @@
+(* Modification of RedBlackSetFn to be able to hold elements that
+ * contain sets themselves. *)
+
 (* redblack-set-fn.sml
  *
  * COPYRIGHT (c) 2014 The Fellowship of SML/NJ (http://www.smlnj.org)
@@ -23,20 +26,54 @@
  * will be black and its child will be a red leaf.
  *)
 
-functor RedBlackSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_key =
+structure RedBlackSetCore =
+struct
+    (* The set and compare are moved from the core RedBlackSetFn and made
+     * polymorphic. *)
+    datatype color = R | B
+    datatype 'a tree
+      = E
+      | T of (color * 'a tree * 'a * 'a tree)
+
+    datatype 'a set = SET of (int * 'a tree)
+
+    (* Need to move helper routines for compare also *)
+    (* functions for walking the tree while keeping a stack of parents
+     * to be visited.
+     *)
+    fun next ((t as T(_, _, _, b))::rest) = (t, left(b, rest))
+      | next _ = (E, [])
+    and left (E, rest) = rest
+      | left (t as T(_, a, _, _), rest) = left(a, t::rest)
+    fun start m = left(m, [])
+
+  (* Return the lexical order of two sets *)
+    fun compare key_cmp (SET(_, s1), SET(_, s2)) = let
+	  fun cmp (t1, t2) = (case (next t1, next t2)
+		 of ((E, _), (E, _)) => EQUAL
+		  | ((E, _), _) => LESS
+		  | (_, (E, _)) => GREATER
+		  | ((T(_, _, x, _), r1), (T(_, _, y, _), r2)) => (
+		      case key_cmp(x, y)
+		       of EQUAL => cmp (r1, r2)
+			| order => order
+		      (* end case *))
+		(* end case *))
+	  in
+	    cmp (start s1, start s2)
+	  end
+end
+
+functor RedBlackSetRecFn (K : ORD_KEY) : ORD_SET where type Key.ord_key = K.ord_key =
   struct
 
     structure Key = K
 
     type item = K.ord_key
-
-    datatype color = R | B
-
-    datatype tree
-      = E
-      | T of (color * tree * item * tree)
-
-    datatype set = SET of (int * tree)
+    open RedBlackSetCore
+    type tree = item tree
+    type set = item set
+    val compare = compare K.compare
 
     fun isEmpty (SET(_, E)) = true
       | isEmpty _ = false
@@ -240,15 +277,6 @@ functor RedBlackSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_ke
   (* return an ordered list of the items in the set. *)
     fun listItems s = foldr (fn (x, l) => x::l) [] s
 
-  (* functions for walking the tree while keeping a stack of parents
-   * to be visited.
-   *)
-    fun next ((t as T(_, _, _, b))::rest) = (t, left(b, rest))
-      | next _ = (E, [])
-    and left (E, rest) = rest
-      | left (t as T(_, a, _, _), rest) = left(a, t::rest)
-    fun start m = left(m, [])
-
   (* Return true if and only if the two sets are equal *)
     fun equal (SET(_, s1), SET(_, s2)) = let
 	  fun cmp (t1, t2) = (case (next t1, next t2)
@@ -259,22 +287,6 @@ functor RedBlackSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_ke
 		      case Key.compare(x, y)
 		       of EQUAL => cmp (r1, r2)
 			| _ => false
-		      (* end case *))
-		(* end case *))
-	  in
-	    cmp (start s1, start s2)
-	  end
-
-  (* Return the lexical order of two sets *)
-    fun compare (SET(_, s1), SET(_, s2)) = let
-	  fun cmp (t1, t2) = (case (next t1, next t2)
-		 of ((E, _), (E, _)) => EQUAL
-		  | ((E, _), _) => LESS
-		  | (_, (E, _)) => GREATER
-		  | ((T(_, _, x, _), r1), (T(_, _, y, _), r2)) => (
-		      case Key.compare(x, y)
-		       of EQUAL => cmp (r1, r2)
-			| order => order
 		      (* end case *))
 		(* end case *))
 	  in
@@ -476,3 +488,11 @@ functor RedBlackSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_ke
 	  end
 
   end;
+
+structure RedBlackSetCore : SET_CORE = RedBlackSetCore
+
+functor RedBlackSetFn (K : ORD_KEY) :> ORD_SET where type Key.ord_key = K.ord_key =
+struct
+  structure S = RedBlackSetRecFn(K)
+  open S
+end
