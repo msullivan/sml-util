@@ -9,17 +9,57 @@
  *
  *)
 
-functor SplayMapFn (K : ORD_KEY) : ORD_MAP =
-  struct
-    structure Key = K
+structure SplayMapCore =
+struct
+    (* The underlying type and the collate function are pulled from the
+     * main functor and made polymorphic. *)
     open SplayTree
 
-    datatype 'a map
+    datatype ('k, 'v) map
       = EMPTY
       | MAP of {
-	  root : (K.ord_key * 'a) splay ref,
+	  root : ('k * 'v) splay ref,
 	  nobj : int
 	}
+
+    local
+      fun next ((t as SplayObj{right, ...})::rest) = (t, left(right, rest))
+	| next _ = (SplayNil, [])
+      and left (SplayNil, rest) = rest
+	| left (t as SplayObj{left=l, ...}, rest) = left(l, t::rest)
+    in
+    fun collate _ cmpRng (EMPTY, EMPTY) = EQUAL
+      | collate _ cmpRng (EMPTY, _) = LESS
+      | collate _ cmpRng (_, EMPTY) = GREATER
+      | collate cmpKey cmpRng (MAP{root=s1, ...}, MAP{root=s2, ...}) = let
+	  fun cmp (t1, t2) = (case (next t1, next t2)
+		 of ((SplayNil, _), (SplayNil, _)) => EQUAL
+		  | ((SplayNil, _), _) => LESS
+		  | (_, (SplayNil, _)) => GREATER
+		  | ((SplayObj{value=(x1, y1), ...}, r1),
+		     (SplayObj{value=(x2, y2), ...}, r2)
+		    ) => (
+		      case cmpKey(x1, x2)
+		       of EQUAL => (case cmpRng (y1, y2)
+			     of EQUAL => cmp (r1, r2)
+			      | order => order
+			    (* end case *))
+			| order => order
+		      (* end case *))
+		(* end case *))
+	  in
+	    cmp (left(!s1, []), left(!s2, []))
+	  end
+    end (* local *)
+end
+
+functor SplayMapRecFn (K : ORD_KEY) : ORD_MAP =
+  struct
+    structure Key = K
+
+    open SplayMapCore
+    type 'a map = (K.ord_key, 'a) map
+    fun collate cmp = SplayMapCore.collate Key.compare cmp
 
     fun cmpf k (k', _) = K.compare(k',k)
 
@@ -137,36 +177,6 @@ functor SplayMapFn (K : ORD_KEY) : ORD_MAP =
         in
           apply (!root, [])
         end
-
-    local
-      fun next ((t as SplayObj{right, ...})::rest) = (t, left(right, rest))
-	| next _ = (SplayNil, [])
-      and left (SplayNil, rest) = rest
-	| left (t as SplayObj{left=l, ...}, rest) = left(l, t::rest)
-    in
-    fun collate cmpRng (EMPTY, EMPTY) = EQUAL
-      | collate cmpRng (EMPTY, _) = LESS
-      | collate cmpRng (_, EMPTY) = GREATER
-      | collate cmpRng (MAP{root=s1, ...}, MAP{root=s2, ...}) = let
-	  fun cmp (t1, t2) = (case (next t1, next t2)
-		 of ((SplayNil, _), (SplayNil, _)) => EQUAL
-		  | ((SplayNil, _), _) => LESS
-		  | (_, (SplayNil, _)) => GREATER
-		  | ((SplayObj{value=(x1, y1), ...}, r1),
-		     (SplayObj{value=(x2, y2), ...}, r2)
-		    ) => (
-		      case Key.compare(x1, x2)
-		       of EQUAL => (case cmpRng (y1, y2)
-			     of EQUAL => cmp (r1, r2)
-			      | order => order
-			    (* end case *))
-			| order => order
-		      (* end case *))
-		(* end case *))
-	  in
-	    cmp (left(!s1, []), left(!s2, []))
-	  end
-    end (* local *)
 
 	(* Apply a function to the entries of the dictionary *)
     fun appi af EMPTY = ()
@@ -429,3 +439,11 @@ functor SplayMapFn (K : ORD_KEY) : ORD_MAP =
 	  end
 
   end (* SplayDictFn *)
+
+structure SplayMapCore : MAP_CORE = SplayMapCore
+
+functor SplayMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
+struct
+  structure S = SplayMapRecFn(K)
+  open S
+end

@@ -43,7 +43,48 @@
  *
  *)
 
-functor BinaryMapFn (K : ORD_KEY) : ORD_MAP =
+structure BinaryMapCore =
+struct
+    (* The underlying type and the collate function are pulled from the
+     * main functor and made polymorphic. *)
+    type ('k, 'v) map = ('k * 'v) list
+    datatype ('k, 'v) map
+      = E
+      | T of {
+          key : 'k,
+          value : 'v,
+          cnt : int,
+          left : ('k, 'v) map,
+          right : ('k, 'v) map
+	  }
+
+    local
+      fun next ((t as T{right, ...})::rest) = (t, left(right, rest))
+	| next _ = (E, [])
+      and left (E, rest) = rest
+	| left (t as T{left=l, ...}, rest) = left(l, t::rest)
+    in
+    fun collate cmpKey cmpRng (s1, s2) = let
+	  fun cmp (t1, t2) = (case (next t1, next t2)
+		 of ((E, _), (E, _)) => EQUAL
+		  | ((E, _), _) => LESS
+		  | (_, (E, _)) => GREATER
+		  | ((T{key=x1, value=y1, ...}, r1), (T{key=x2, value=y2, ...}, r2)) => (
+		      case cmpKey(x1, x2)
+		       of EQUAL => (case cmpRng(y1, y2)
+			     of EQUAL => cmp (r1, r2)
+			      | order => order
+			    (* end case *))
+			| order => order
+		      (* end case *))
+		(* end case *))
+	  in
+	    cmp (left(s1, []), left(s2, []))
+	  end
+    end (* local *)
+end
+
+functor BinaryMapRecFn (K : ORD_KEY) : ORD_MAP =
   struct
 
     structure Key = K
@@ -54,15 +95,9 @@ functor BinaryMapFn (K : ORD_KEY) : ORD_MAP =
     *)
     fun wt (i : int) = i + i + i
 
-    datatype 'a map
-      = E
-      | T of {
-          key : K.ord_key,
-          value : 'a,
-          cnt : int,
-          left : 'a map,
-          right : 'a map
-	}
+    open BinaryMapCore
+    type 'a map = (Key.ord_key, 'a) map
+    fun collate cmp = BinaryMapCore.collate Key.compare cmp
 
     val empty = E
 
@@ -237,31 +272,6 @@ in
 	  in
 	    d2l (d,[])
 	  end
-
-    local
-      fun next ((t as T{right, ...})::rest) = (t, left(right, rest))
-	| next _ = (E, [])
-      and left (E, rest) = rest
-	| left (t as T{left=l, ...}, rest) = left(l, t::rest)
-    in
-    fun collate cmpRng (s1, s2) = let
-	  fun cmp (t1, t2) = (case (next t1, next t2)
-		 of ((E, _), (E, _)) => EQUAL
-		  | ((E, _), _) => LESS
-		  | (_, (E, _)) => GREATER
-		  | ((T{key=x1, value=y1, ...}, r1), (T{key=x2, value=y2, ...}, r2)) => (
-		      case Key.compare(x1, x2)
-		       of EQUAL => (case cmpRng(y1, y2)
-			     of EQUAL => cmp (r1, r2)
-			      | order => order
-			    (* end case *))
-			| order => order
-		      (* end case *))
-		(* end case *))
-	  in
-	    cmp (left(s1, []), left(s2, []))
-	  end
-    end (* local *)
 
     fun appi f d = let
 	  fun app' E = ()
@@ -485,3 +495,11 @@ in
 	  end
 
   end (* functor BinaryMapFn *)
+
+structure BinaryMapCore : MAP_CORE = BinaryMapCore
+
+functor BinaryMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
+struct
+  structure S = BinaryMapRecFn(K)
+  open S
+end

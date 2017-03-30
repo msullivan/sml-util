@@ -9,12 +9,35 @@
  * representation.
  *)
 
-functor ListMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
+structure ListMapCore =
+struct
+    (* The underlying type and the collate function are pulled from the
+     * main functor and made polymorphic. *)
+    type ('k, 'v) map = ('k * 'v) list
+    fun collate cmpKey cmpRng = let
+	  fun cmp ([], []) = EQUAL
+	    | cmp ([], _) = LESS
+	    | cmp (_, []) = GREATER
+	    | cmp ((x1, y1)::r1, (x2, y2)::r2) = (case cmpKey(x1, x2)
+		 of EQUAL => (case cmpRng(y1, y2)
+		       of EQUAL => cmp (r1, r2)
+			| order => order
+		      (* end case *))
+		  | order => order
+		(* end case *))
+	  in
+	    cmp
+	  end
+end
+
+functor ListMapRecFn (K : ORD_KEY) : ORD_MAP where type Key.ord_key = K.ord_key =
   struct
 
     structure Key = K
 
-    type 'a map = (K.ord_key * 'a) list
+    open ListMapCore
+    type 'a map = (K.ord_key, 'a) map
+    fun collate cmp = ListMapCore.collate Key.compare cmp
 
     val empty = []
 
@@ -101,21 +124,6 @@ functor ListMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
     fun listItemsi l = l
 
     fun listKeys (l : 'a map) = List.map #1 l
-
-    fun collate cmpRng = let
-	  fun cmp ([], []) = EQUAL
-	    | cmp ([], _) = LESS
-	    | cmp (_, []) = GREATER
-	    | cmp ((x1, y1)::r1, (x2, y2)::r2) = (case Key.compare(x1, x2)
-		 of EQUAL => (case cmpRng(y1, y2)
-		       of EQUAL => cmp (r1, r2)
-			| order => order
-		      (* end case *))
-		  | order => order
-		(* end case *))
-	  in
-	    cmp
-	  end
 
   (* return a map whose domain is the union of the domains of the two input
    * maps, using the supplied function to define the map on elements that
@@ -282,3 +290,10 @@ functor ListMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
 
   end (* functor ListMapFn *)
 
+structure ListMapCore : MAP_CORE = ListMapCore
+
+functor ListMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
+struct
+  structure S = ListMapRecFn(K)
+  open S
+end

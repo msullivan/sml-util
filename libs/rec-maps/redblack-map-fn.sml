@@ -23,18 +23,61 @@
  * will be black and its child will be a red leaf.
  *)
 
-functor RedBlackMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
+structure RedBlackMapCore =
+struct
+    (* The underlying type and the collate function are pulled from the
+     * main functor and made polymorphic. *)
+    datatype color = R | B
+
+    datatype ('k, 'v) tree
+      = E
+      | T of (color * ('k, 'v) tree * 'k * 'v * ('k, 'v) tree)
+
+    datatype ('k, 'v) map = MAP of (int * ('k, 'v) tree)
+
+    (* Need to move helper routines for compare also *)
+    (* functions for walking the tree while keeping a stack of parents
+     * to be visited.
+     *)
+    fun next ((t as T(_, _, _, _, b))::rest) = (t, left(b, rest))
+      | next _ = (E, [])
+    and left (E, rest) = rest
+      | left (t as T(_, a, _, _, _), rest) = left(a, t::rest)
+    fun start m = left(m, [])
+
+  (* given an ordering on the map's keys and range, return an ordering
+   * on the map.
+   *)
+    fun collate cmpKey cmpRng = let
+	  fun cmp (t1, t2) = (case (next t1, next t2)
+		 of ((E, _), (E, _)) => EQUAL
+		  | ((E, _), _) => LESS
+		  | (_, (E, _)) => GREATER
+		  | ((T(_, _, xk, x, _), r1), (T(_, _, yk, y, _), r2)) => (
+		      case cmpKey(xk, yk)
+		       of EQUAL => (case cmpRng(x, y)
+			     of EQUAL => cmp (r1, r2)
+			      | order => order
+			    (* end case *))
+			| order => order
+		      (* end case *))
+		(* end case *))
+	  in
+	    fn (MAP(_, m1), MAP(_, m2)) => cmp (start m1, start m2)
+	  end
+
+
+end
+
+functor RedBlackMapRecFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
   struct
 
     structure Key = K
 
-    datatype color = R | B
-
-    datatype 'a tree
-      = E
-      | T of (color * 'a tree * K.ord_key * 'a * 'a tree)
-
-    datatype 'a map = MAP of (int * 'a tree)
+    open RedBlackMapCore
+    type 'a tree = (K.ord_key, 'a) tree
+    type 'a map = (K.ord_key, 'a) map
+    fun collate cmp = RedBlackMapCore.collate Key.compare cmp
 
     fun isEmpty (MAP(_, E)) = true
       | isEmpty _ = false
@@ -298,36 +341,6 @@ functor RedBlackMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_ke
 
   (* return an ordered list of the keys in the map. *)
     fun listKeys m = foldri (fn (k, _, l) => k::l) [] m
-
-  (* functions for walking the tree while keeping a stack of parents
-   * to be visited.
-   *)
-    fun next ((t as T(_, _, _, _, b))::rest) = (t, left(b, rest))
-      | next _ = (E, [])
-    and left (E, rest) = rest
-      | left (t as T(_, a, _, _, _), rest) = left(a, t::rest)
-    fun start m = left(m, [])
-
-  (* given an ordering on the map's range, return an ordering
-   * on the map.
-   *)
-    fun collate cmpRng = let
-	  fun cmp (t1, t2) = (case (next t1, next t2)
-		 of ((E, _), (E, _)) => EQUAL
-		  | ((E, _), _) => LESS
-		  | (_, (E, _)) => GREATER
-		  | ((T(_, _, xk, x, _), r1), (T(_, _, yk, y, _), r2)) => (
-		      case Key.compare(xk, yk)
-		       of EQUAL => (case cmpRng(x, y)
-			     of EQUAL => cmp (r1, r2)
-			      | order => order
-			    (* end case *))
-			| order => order
-		      (* end case *))
-		(* end case *))
-	  in
-	    fn (MAP(_, m1), MAP(_, m2)) => cmp (start m1, start m2)
-	  end
 
   (* support for constructing red-black trees in linear time from increasing
    * ordered sequences (based on a description by R. Hinze).  Note that the
@@ -597,3 +610,11 @@ functor RedBlackMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_ke
 	  end
 
   end;
+
+structure RedBlackMapCore : MAP_CORE = RedBlackMapCore
+
+functor RedBlackMapFn (K : ORD_KEY) :> ORD_MAP where type Key.ord_key = K.ord_key =
+struct
+  structure S = RedBlackMapRecFn(K)
+  open S
+end
