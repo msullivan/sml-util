@@ -403,15 +403,6 @@ struct
   val foldr = foldr_ftree
 end
 
-structure TrivialMM : MEASURABLE_MONOID =
-struct
-    type 'a t = 'a
-    type annot = unit
-    val a_ident = ()
-    fun measure _ = a_ident
-    fun a_plus (_, _) = a_ident
-end
-
 structure SizeMM : MEASURABLE_MONOID =
 struct
     type 'a t = 'a
@@ -420,20 +411,6 @@ struct
     fun measure _ = 1
     fun a_plus (x, y) = x+y
 end
-
-functor KeyMM(type key) (*: MEASURABLE_MONOID*) =
-struct
-  type 'a t = key * 'a
-  datatype annot = NoKey | Key of key
-  val a_ident = NoKey
-  fun measure (k, _) = Key k
-  fun a_plus (a, NoKey) = a
-    | a_plus (_, b) = b
-end
-
-structure SimpleSeq = FingerTreeFn(TrivialMM)
-
-
 
 signature IDX_SEQ =
 sig
@@ -499,51 +476,3 @@ struct
     in l >< s' >< r end
   fun insertAt x n s = spliceAt (singleton x) n s
 end
-
-(* This is exactly ORD_KEY but without me needing to get mlton to know *)
-signature KEY = sig type ord_key val compare : ord_key * ord_key -> order end
-(* This is probably not worth doing... we already have maps *)
-functor FingerTreeMap(K : KEY) =
-struct
-  type key = K.ord_key
-
-  local
-      structure MM = KeyMM(type key = key)
-      structure F = FingerTreeFn(MM)
-      infixr 5 << >< infix 5 >> open F.Infix
-
-      fun search k MM.NoKey = false
-        | search k (MM.Key k') = (K.compare (k, k')) <> GREATER
-      fun split3 t k = F.splitPred3 (search k) t
-      fun splitLazy3 t k = F.splitPredLazy3 (search k) t
-
-      fun eq a b = K.compare (a, b) = EQUAL
-  in
-
-  type 'a map = (key * 'a) F.finger_tree
-  val empty = F.empty
-
-  fun look map k =
-    if not (search k (F.measure map)) then NONE else
-    let val (_, (k', v), _) = splitLazy3 map k
-    in if eq k k' then SOME v else NONE end
-
-  fun bind map k v =
-    if not (search k (F.measure map)) then map >> (k, v) else
-    let val (l, (k', v'), r) = split3 map k
-    in
-        if eq k k' then l >< (k, v) << r
-        else l >< (k, v) << (k', v') << r
-    end
-
-  fun insert' ((k, v), map) = bind map k v
-
-  fun addList map entries = foldl insert' map entries
-  fun fromList entries = addList empty entries
-
-  val toList = F.toList
-
-  end
-
-end
-structure FTIntMap = FingerTreeMap(struct type ord_key = int val compare = Int.compare end)
