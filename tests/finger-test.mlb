@@ -1,0 +1,5 @@
+$(SML_LIB)/basis/basis.mlb
+../libs/lazy.sml
+../libs/finger-tree.sml
+finger-test.sml
+main.sml

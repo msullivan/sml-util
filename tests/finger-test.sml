@@ -42,8 +42,6 @@ struct
   structure S = IdxSeq
 
 
-end
+end;
 
-(*
-JosephusTest.run ();
-*)
+fun main () = JosephusTest.run ()
