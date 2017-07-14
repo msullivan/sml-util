@@ -43,51 +43,50 @@
 (* Should I split this into MEASURABLE and MONOID? Probably not. *)
 signature FINGER_TREE =
 sig
-    type 'a t
     type 'a finger_tree
-    type annot
+    type annot = int
 
     datatype 'a viewl = ConsLV of 'a * 'a finger_tree Susp.susp | NilLV
     datatype 'a view = ConsV of 'a * 'a finger_tree | NilV
 
-    val measure : 'a t finger_tree -> annot
+    val measure : 'a finger_tree -> annot
 
     val toList : 'a finger_tree -> 'a list
-    val fromList : 'a t list -> 'a t finger_tree
+    val fromList : 'a list -> 'a finger_tree
 
     val foldl : ('a * 'b -> 'b) -> 'b -> 'a finger_tree -> 'b
     val foldr : ('a * 'b -> 'b) -> 'b -> 'a finger_tree -> 'b
 
-    val empty : 'a t finger_tree
-    val singleton : 'a t -> 'a t finger_tree
-    val fcons : 'a t -> 'a t finger_tree -> 'a t finger_tree
-    val fcons' : 'a t * 'a t finger_tree -> 'a t finger_tree
-    val rcons : 'a t -> 'a t finger_tree -> 'a t finger_tree
-    val rcons' : 'a t * 'a t finger_tree -> 'a t finger_tree
+    val empty : 'a finger_tree
+    val singleton : 'a -> 'a finger_tree
+    val fcons : 'a -> 'a finger_tree -> 'a finger_tree
+    val fcons' : 'a * 'a finger_tree -> 'a finger_tree
+    val rcons : 'a -> 'a finger_tree -> 'a finger_tree
+    val rcons' : 'a * 'a finger_tree -> 'a finger_tree
 
     structure Infix : sig
-        val << : 'a t * 'a t finger_tree -> 'a t finger_tree
-        val >< : 'a t finger_tree * 'a t finger_tree -> 'a t finger_tree
-        val >> : 'a t finger_tree * 'a t -> 'a t finger_tree
+        val << : 'a * 'a finger_tree -> 'a finger_tree
+        val >< : 'a finger_tree * 'a finger_tree -> 'a finger_tree
+        val >> : 'a finger_tree * 'a -> 'a finger_tree
     end
 
-    val append : 'a t finger_tree -> 'a t finger_tree -> 'a t finger_tree
+    val append : 'a finger_tree -> 'a finger_tree -> 'a finger_tree
 
-    val viewl : 'a t finger_tree -> 'a t view
-    val viewr : 'a t finger_tree -> 'a t view
-    val viewll : 'a t finger_tree -> 'a t viewl
-    val viewlr : 'a t finger_tree -> 'a t viewl
+    val viewl : 'a finger_tree -> 'a view
+    val viewr : 'a finger_tree -> 'a view
+    val viewll : 'a finger_tree -> 'a viewl
+    val viewlr : 'a finger_tree -> 'a viewl
 
     exception NotFound
-    val splitPredLazy3 : (annot -> bool) -> 'a t finger_tree
-                         -> 'a t finger_tree Susp.susp * 'a t *
-                            'a t finger_tree Susp.susp
-    val splitPred3 : (annot -> bool) -> 'a t finger_tree
-                     -> 'a t finger_tree * 'a t * 'a t finger_tree
-    val splitPredLazy : (annot -> bool) -> 'a t finger_tree
-                        -> 'a t finger_tree Susp.susp * 'a t finger_tree Susp.susp
-    val splitPred : (annot -> bool) -> 'a t finger_tree
-                    -> 'a t finger_tree * 'a t finger_tree
+    val splitPredLazy3 : (annot -> bool) -> 'a finger_tree
+                         -> 'a finger_tree Susp.susp * 'a *
+                            'a finger_tree Susp.susp
+    val splitPred3 : (annot -> bool) -> 'a finger_tree
+                     -> 'a finger_tree * 'a * 'a finger_tree
+    val splitPredLazy : (annot -> bool) -> 'a finger_tree
+                        -> 'a finger_tree Susp.susp * 'a finger_tree Susp.susp
+    val splitPred : (annot -> bool) -> 'a finger_tree
+                    -> 'a finger_tree * 'a finger_tree
 
     val forceAll : 'a finger_tree -> 'a finger_tree
 end
@@ -96,7 +95,6 @@ signature IDX_SEQ =
 sig
     type 'a seq
     include FINGER_TREE where type 'a finger_tree = 'a seq
-                          and type 'a t = 'a
 
     val split : int -> 'a seq -> 'a seq * 'a seq
     val take : int -> 'a seq -> 'a seq
@@ -113,7 +111,6 @@ end
 structure FingerTree =
 struct
   (* lurr *)
-  type 'a t = 'a
   type annot = int
   fun a_plus (x, y) = x+y
   val a_ident = 0
