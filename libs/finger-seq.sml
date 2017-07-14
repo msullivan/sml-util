@@ -41,15 +41,6 @@
 
 
 (* Should I split this into MEASURABLE and MONOID? Probably not. *)
-signature MEASURABLE_MONOID =
-sig
-    type 'a t
-    type annot
-    val measure : 'a t -> annot
-    val a_ident : annot
-    val a_plus : annot * annot -> annot
-end
-
 signature FINGER_TREE =
 sig
     type 'a t
@@ -101,10 +92,32 @@ sig
     val forceAll : 'a finger_tree -> 'a finger_tree
 end
 
-functor FingerTreeFn(T : MEASURABLE_MONOID) : FINGER_TREE =
+signature IDX_SEQ =
+sig
+    type 'a seq
+    include FINGER_TREE where type 'a finger_tree = 'a seq
+                          and type 'a t = 'a
+
+    val split : int -> 'a seq -> 'a seq * 'a seq
+    val take : int -> 'a seq -> 'a seq
+    val drop : int -> 'a seq -> 'a seq
+    val length : 'a seq -> int
+    val nth : int -> 'a seq -> 'a
+    val deleteAt : int -> 'a seq -> 'a seq
+    val spliceAt : 'a seq -> int -> 'a seq -> 'a seq
+    val insertAt : 'a -> int -> 'a seq -> 'a seq
+    val update : 'a -> int -> 'a seq -> 'a seq
+    val subseq : int -> int -> 'a seq -> 'a seq
+end
+
+structure FingerTree =
 struct
-  type 'a t = 'a T.t
-  type annot = T.annot
+  (* lurr *)
+  type 'a t = 'a
+  type annot = int
+  fun a_plus (x, y) = x+y
+  val a_ident = 0
+
 
   datatype 'a node = Node2 of (annot * 'a * 'a) | Node3 of (annot * 'a * 'a * 'a)
   datatype 'a elem = O of 'a
@@ -173,24 +186,24 @@ struct
   fun measure_node (Node2 (x, _, _)) = x
     | measure_node (Node3 (x, _, _, _)) = x
 
-  fun measure (O x) = T.measure x
+  fun measure (O _) = 1
     | measure (N x) = measure_node x
 
-  fun measure_digit l = foldl (fn (x, b) => T.a_plus (measure x, b)) T.a_ident l
-  fun measure_tree Empty = T.a_ident
+  fun measure_digit l = foldl (fn (x, b) => a_plus (measure x, b)) a_ident l
+  fun measure_tree Empty = a_ident
     | measure_tree (Single x) = measure x
     | measure_tree (Deep (m, _, _, _)) = force m
 
 
   (*** Smart constructors that handle annots *)
   fun deep a b c =
-    let val m = delay (fn _ => T.a_plus (measure_digit a,
-                                         T.a_plus (measure_tree (force b),
+    let val m = delay (fn _ => a_plus (measure_digit a,
+                                         a_plus (measure_tree (force b),
                                                    measure_digit c)))
     in Deep (m, a, b, c) end
-  fun node2 a b = N (Node2 (T.a_plus (measure a, measure b),
+  fun node2 a b = N (Node2 (a_plus (measure a, measure b),
                             a, b))
-  fun node3 a b c = N (Node3 (T.a_plus (measure a, T.a_plus (measure b, measure c)),
+  fun node3 a b c = N (Node3 (a_plus (measure a, a_plus (measure b, measure c)),
                                 a, b, c))
 
   (*** Constructing via cons ***)
@@ -297,7 +310,7 @@ struct
   (*** Splitting ***)
   fun splitDigit p i [x] = ([], x, [])
     | splitDigit p i (x::xs) =
-      let val i' = T.a_plus (i, measure x)
+      let val i' = a_plus (i, measure x)
       in
           if p i' then ([], x, xs) else
           let val (l, y, r) = splitDigit p i' xs
@@ -309,16 +322,16 @@ struct
   (* I think making this lazy is probably good >_> *)
   fun splitTree_m p i (Single x) = (eager empty, x, eager empty)
     | splitTree_m p i (Deep (_, pr, m, sf)) =
-    let val vpr = T.a_plus (i, measure_digit pr)
+    let val vpr = a_plus (i, measure_digit pr)
     in if p vpr then let
            val (l, x, r) = splitDigit p i pr
        in (delay (fn _=>toTree_f_m foldl l), x,
            delay (fn _=>deep_l r m sf)) end
-       else let val vm = T.a_plus (vpr, measure_tree (force m))
+       else let val vm = a_plus (vpr, measure_tree (force m))
             in if p vm then let
                    val (ml, xs, mr) = splitTree_m p vpr (force m)
                    val xs = unN xs
-                   val (l, x, r) = splitDigit p (T.a_plus (vpr,
+                   val (l, x, r) = splitDigit p (a_plus (vpr,
                                                              measure_tree (force ml)))
                                               (toList_node xs)
                in (delay (fn _=>deep_r pr ml l), x,
@@ -333,15 +346,15 @@ struct
 
   fun splitTree_m' p i (Single x) = (empty, x, empty)
     | splitTree_m' p i (Deep (_, pr, m, sf)) =
-    let val vpr = T.a_plus (i, measure_digit pr)
+    let val vpr = a_plus (i, measure_digit pr)
     in if p vpr then let
            val (l, x, r) = splitDigit p i pr
        in (toTree_f_m foldr l, x, deep_l r m sf) end
-       else let val vm = T.a_plus (vpr, measure_tree (force m))
+       else let val vm = a_plus (vpr, measure_tree (force m))
             in if p vm then let
                    val (ml, xs, mr) = splitTree_m' p vpr (force m)
                    val xs = unN xs
-                   val (l, x, r) = splitDigit p (T.a_plus (vpr,
+                   val (l, x, r) = splitDigit p (a_plus (vpr,
                                                              measure_tree ml))
                                               (toList_node xs)
                in (deep_r pr (eager ml) l, x, deep_l r (eager mr) sf) end
@@ -354,11 +367,11 @@ struct
 
 
   fun splitPredLazy3 p t =
-    let val (l, x, r) = splitTree_m p T.a_ident t
+    let val (l, x, r) = splitTree_m p a_ident t
     in (l, unO x, r) end
 
   fun splitPred3 p t =
-    let val (l, x, r) = splitTree_m' p T.a_ident t
+    let val (l, x, r) = splitTree_m' p a_ident t
     in (l, unO x, r) end
 (*
   fun splitPred3 p t =
@@ -403,36 +416,9 @@ struct
   val foldr = foldr_ftree
 end
 
-structure SizeMM : MEASURABLE_MONOID =
-struct
-    type 'a t = 'a
-    type annot = int
-    val a_ident = 0
-    fun measure _ = 1
-    fun a_plus (x, y) = x+y
-end
-
-signature IDX_SEQ =
-sig
-    type 'a seq
-    include FINGER_TREE where type 'a finger_tree = 'a seq
-                          and type 'a t = 'a
-
-    val split : int -> 'a seq -> 'a seq * 'a seq
-    val take : int -> 'a seq -> 'a seq
-    val drop : int -> 'a seq -> 'a seq
-    val length : 'a seq -> int
-    val nth : int -> 'a seq -> 'a
-    val deleteAt : int -> 'a seq -> 'a seq
-    val spliceAt : 'a seq -> int -> 'a seq -> 'a seq
-    val insertAt : 'a -> int -> 'a seq -> 'a seq
-    val update : 'a -> int -> 'a seq -> 'a seq
-    val subseq : int -> int -> 'a seq -> 'a seq
-end
-
 structure IdxSeq : IDX_SEQ =
 struct
-  structure F = FingerTreeFn(SizeMM)
+  structure F = FingerTree
   open F
   open Susp
   type 'a seq = 'a finger_tree
