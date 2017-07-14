@@ -1,42 +1,53 @@
 signature ANSI =
   sig
     type color
-    type full_color = color * bool
-    val black : color
-    val red : color
-    val green : color
-    val yellow : color
-    val blue : color
-    val magenta : color
-    val cyan : color
-    val white : color
-    val dark_black : full_color
-    val dark_red : full_color
-    val dark_green : full_color
-    val dark_yellow : full_color
-    val dark_blue : full_color
-    val dark_magenta : full_color
-    val dark_cyan : full_color
-    val dark_white : full_color
-    val dark_gray : full_color
-    val bright_red : full_color
-    val bright_green : full_color
-    val bright_yellow : full_color
-    val bright_blue : full_color
-    val bright_magenta : full_color
-    val bright_cyan : full_color
-    val bright_white : full_color
+    val dark_black : color
+    val dark_red : color
+    val dark_green : color
+    val dark_yellow : color
+    val dark_blue : color
+    val dark_magenta : color
+    val dark_cyan : color
+    val dark_white : color
+    val dark_gray : color
+    val bright_red : color
+    val bright_green : color
+    val bright_yellow : color
+    val bright_blue : color
+    val bright_magenta : color
+    val bright_cyan : color
+    val bright_white : color
+
+    val defaultFgColor : string
+    val defaultBgColor : string
+    val fgColor : color -> string
+    val bgColor : color -> string
+    val colorStr : string -> color -> color -> string
+
     val reset : string
     val underline : bool -> string
     val bold : bool -> string
-    val fullColor : full_color -> string
-    val colorStr : string -> full_color -> string
+    val blink : bool -> string
+    val inverse : bool -> string
+    val cursorUp : int -> string
+    val cursorDown : int -> string
+    val cursorForward : int -> string
+    val cursorBack : int -> string
+    val cursorNextLine : int -> string
+    val cursorPrevLine : int -> string
+    val cursorSetCol : int -> string
+    val cursorPosition : int * int -> string
+    val cursorVisible : bool -> string
+    val clearScreen : int -> string
+    val clearLine : int -> string
+    val scrollUp : int -> string
+    val scrollDown : int -> string
   end
 
 
-structure Ansi (*:> ANSI*) =
+structure Ansi :> ANSI =
 struct
-  (* Control Sequence Introducer *)
+  (* Control Sequence Introducer: Miami *)
   val CSI = "\^[["
 
   (* Send a one argument command *)
@@ -47,8 +58,8 @@ struct
   (* Send a "Select Graphic Rendition" command *)
   val SGR = cmd1 "m"
 
-  type color = int
-  type full_color = color * bool
+  type half_color = int
+  type color = half_color * bool
 
   val (black, red, green, yellow, blue, magenta, cyan, white) =
       (0, 1, 2, 3, 4, 5, 6, 7)
@@ -70,18 +81,18 @@ struct
     | blink false = SGR 25
   fun inverse true = SGR 7
     | inverse false = SGR 27
+  fun cursorVisible true = CSI ^ "?25l"
+    | cursorVisible false = CSI ^ "?25h"
  
-  fun fgColor color = SGR (30 + color) 
-  fun bgColor color = SGR (40 + color)
+  fun fgOffset half_color = SGR (30 + half_color)
+  fun bgOffset half_color = SGR (40 + half_color)
   val defaultFgColor = SGR 39
   val defaultBgColor = SGR 40
 
-  fun fullColor (color, is_bold) =
-      bold is_bold ^ fgColor color
-  fun colorStr s color = fullColor color ^ s ^ reset
+  fun fgColor (half_color, is_bold) = bold is_bold ^ fgOffset half_color
+  fun bgColor (half_color, _) = bgOffset half_color
+  fun colorStr s fg bg = fgColor fg ^ bgColor bg ^ s ^ reset
 
-  type clear = int
-  val (Forward, Backward, Full) = (0, 1, 2)
   val cursorUp = cmd1 "A"
   val cursorDown = cmd1 "B"
   val cursorForward = cmd1 "C"
@@ -94,7 +105,4 @@ struct
   val clearLine = cmd1 "K"
   val scrollUp = cmd1 "S"
   val scrollDown = cmd1 "T"
-
-  fun cursorVisible true = CSI ^ "?25l"
-    | cursorVisible false = CSI ^ "?25h"
 end
