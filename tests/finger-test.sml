@@ -22,6 +22,7 @@ struct
     in s'' >< keep end
   *)
   fun step s =
+
     let val S.ConsV (keep, s') = S.viewl s
         val s'' = S.deleteAt ((S.length s' - 1) div 2) s'
     in s'' >> keep end

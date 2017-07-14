@@ -108,7 +108,7 @@ sig
     val subseq : int -> int -> 'a seq -> 'a seq
 end
 
-structure FingerTree =
+structure IdxSeq : IDX_SEQ =
 struct
   (* lurr *)
   type annot = int
@@ -411,12 +411,9 @@ struct
   val measure = measure_tree
   val foldl = foldl_ftree
   val foldr = foldr_ftree
-end
 
-structure IdxSeq : IDX_SEQ =
-struct
-  structure F = FingerTree
-  open F
+
+  (*********** The sequence stuff **************)
   open Susp
   type 'a seq = 'a finger_tree
 
