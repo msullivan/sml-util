@@ -115,7 +115,6 @@ struct
   (* lurr *)
   type annot = int
   fun a_plus (x, y) = x+y
-  val a_ident = 0
 
 
   datatype 'a node = Node2 of (annot * 'a * 'a) | Node3 of (annot * 'a * 'a * 'a)
@@ -188,8 +187,8 @@ struct
   fun measure (O _) = 1
     | measure (N x) = measure_node x
 
-  fun measure_digit l = foldl (fn (x, b) => a_plus (measure x, b)) a_ident l
-  fun measure_tree Empty = a_ident
+  fun measure_digit l = foldl (fn (x, b) => a_plus (measure x, b)) 0 l
+  fun measure_tree Empty = 0
     | measure_tree (Single x) = measure x
     | measure_tree (Deep (m, _, _, _)) = force m
 
@@ -366,11 +365,11 @@ struct
 
 
   fun splitLazy3 n t =
-    let val (l, x, r) = splitTree_m n a_ident t
+    let val (l, x, r) = splitTree_m n 0 t
     in (l, unO x, r) end
 
   fun split3 n t =
-    let val (l, x, r) = splitTree_m' n a_ident t
+    let val (l, x, r) = splitTree_m' n 0 t
     in (l, unO x, r) end
 
   fun splitLazy i Empty = (eager empty, eager empty)
