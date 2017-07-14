@@ -114,8 +114,6 @@ structure IdxSeq : IDX_SEQ =
 struct
   (* lurr *)
   type annot = int
-  fun a_plus (x, y) = x+y
-
 
   datatype 'a node = Node2 of (annot * 'a * 'a) | Node3 of (annot * 'a * 'a * 'a)
   datatype 'a elem = O of 'a
@@ -187,7 +185,7 @@ struct
   fun measure (O _) = 1
     | measure (N x) = measure_node x
 
-  fun measure_digit l = foldl (fn (x, b) => a_plus (measure x, b)) 0 l
+  fun measure_digit l = foldl (fn (x, b) => measure x + b) 0 l
   fun measure_tree Empty = 0
     | measure_tree (Single x) = measure x
     | measure_tree (Deep (m, _, _, _)) = force m
@@ -195,14 +193,12 @@ struct
 
   (*** Smart constructors that handle annots *)
   fun deep a b c =
-    let val m = delay (fn _ => a_plus (measure_digit a,
-                                         a_plus (measure_tree (force b),
-                                                   measure_digit c)))
+    let val m = delay (fn _ => measure_digit a + measure_tree (force b) + measure_digit c)
     in Deep (m, a, b, c) end
-  fun node2 a b = N (Node2 (a_plus (measure a, measure b),
+  fun node2 a b = N (Node2 (measure a + measure b,
                             a, b))
-  fun node3 a b c = N (Node3 (a_plus (measure a, a_plus (measure b, measure c)),
-                                a, b, c))
+  fun node3 a b c = N (Node3 (measure a + measure b + measure c,
+                              a, b, c))
 
   (*** Constructing via cons ***)
   val empty = Empty
@@ -308,7 +304,7 @@ struct
   (*** Splitting ***)
   fun splitDigit n i [x] = ([], x, [])
     | splitDigit n i (x::xs) =
-      let val i' = a_plus (i, measure x)
+      let val i' = i + measure x
       in
           if n < i' then ([], x, xs) else
           let val (l, y, r) = splitDigit n i' xs
@@ -320,17 +316,16 @@ struct
   (* I think making this lazy is probably good >_> *)
   fun splitTree_m n i (Single x) = (eager empty, x, eager empty)
     | splitTree_m n i (Deep (_, pr, m, sf)) =
-    let val vpr = a_plus (i, measure_digit pr)
+    let val vpr = i + measure_digit pr
     in if n < vpr then let
            val (l, x, r) = splitDigit n i pr
        in (delay (fn _=>toTree_f_m foldl l), x,
            delay (fn _=>deep_l r m sf)) end
-       else let val vm = a_plus (vpr, measure_tree (force m))
+       else let val vm = vpr + measure_tree (force m)
             in if n < vm then let
                    val (ml, xs, mr) = splitTree_m n vpr (force m)
                    val xs = unN xs
-                   val (l, x, r) = splitDigit n (a_plus (vpr,
-                                                             measure_tree (force ml)))
+                   val (l, x, r) = splitDigit n (vpr + measure_tree (force ml))
                                               (toList_node xs)
                in (delay (fn _=>deep_r pr ml l), x,
                    delay (fn _=>deep_l r mr sf)) end
@@ -344,16 +339,15 @@ struct
 
   fun splitTree_m' n i (Single x) = (empty, x, empty)
     | splitTree_m' n i (Deep (_, pr, m, sf)) =
-    let val vpr = a_plus (i, measure_digit pr)
+    let val vpr = i + measure_digit pr
     in if n < vpr then let
            val (l, x, r) = splitDigit n i pr
        in (toTree_f_m foldr l, x, deep_l r m sf) end
-       else let val vm = a_plus (vpr, measure_tree (force m))
+       else let val vm = vpr + measure_tree (force m)
             in if n < vm then let
                    val (ml, xs, mr) = splitTree_m' n vpr (force m)
                    val xs = unN xs
-                   val (l, x, r) = splitDigit n (a_plus (vpr,
-                                                             measure_tree ml))
+                   val (l, x, r) = splitDigit n (vpr + measure_tree ml)
                                               (toList_node xs)
                in (deep_r pr (eager ml) l, x, deep_l r (eager mr) sf) end
 
