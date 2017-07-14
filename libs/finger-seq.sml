@@ -307,81 +307,76 @@ struct
   fun append xs ys = app3 xs [] ys
 
   (*** Splitting ***)
-  fun splitDigit p i [x] = ([], x, [])
-    | splitDigit p i (x::xs) =
+  fun splitDigit n i [x] = ([], x, [])
+    | splitDigit n i (x::xs) =
       let val i' = a_plus (i, measure x)
       in
-          if p i' then ([], x, xs) else
-          let val (l, y, r) = splitDigit p i' xs
+          if n < i' then ([], x, xs) else
+          let val (l, y, r) = splitDigit n i' xs
           in (x::l, y, r) end
       end
     | splitDigit _ _ _ = raise Fail "empty"
 
   exception NotFound
   (* I think making this lazy is probably good >_> *)
-  fun splitTree_m p i (Single x) = (eager empty, x, eager empty)
-    | splitTree_m p i (Deep (_, pr, m, sf)) =
+  fun splitTree_m n i (Single x) = (eager empty, x, eager empty)
+    | splitTree_m n i (Deep (_, pr, m, sf)) =
     let val vpr = a_plus (i, measure_digit pr)
-    in if p vpr then let
-           val (l, x, r) = splitDigit p i pr
+    in if n < vpr then let
+           val (l, x, r) = splitDigit n i pr
        in (delay (fn _=>toTree_f_m foldl l), x,
            delay (fn _=>deep_l r m sf)) end
        else let val vm = a_plus (vpr, measure_tree (force m))
-            in if p vm then let
-                   val (ml, xs, mr) = splitTree_m p vpr (force m)
+            in if n < vm then let
+                   val (ml, xs, mr) = splitTree_m n vpr (force m)
                    val xs = unN xs
-                   val (l, x, r) = splitDigit p (a_plus (vpr,
+                   val (l, x, r) = splitDigit n (a_plus (vpr,
                                                              measure_tree (force ml)))
                                               (toList_node xs)
                in (delay (fn _=>deep_r pr ml l), x,
                    delay (fn _=>deep_l r mr sf)) end
 
-               else let val (l, x, r) = splitDigit p vm sf
+               else let val (l, x, r) = splitDigit n vm sf
                     in (delay (fn _=>deep_r pr m l), x,
                         delay (fn _=>toTree_f_m foldl r)) end
             end
     end
     | splitTree_m _ _ Empty = raise NotFound
 
-  fun splitTree_m' p i (Single x) = (empty, x, empty)
-    | splitTree_m' p i (Deep (_, pr, m, sf)) =
+  fun splitTree_m' n i (Single x) = (empty, x, empty)
+    | splitTree_m' n i (Deep (_, pr, m, sf)) =
     let val vpr = a_plus (i, measure_digit pr)
-    in if p vpr then let
-           val (l, x, r) = splitDigit p i pr
+    in if n < vpr then let
+           val (l, x, r) = splitDigit n i pr
        in (toTree_f_m foldr l, x, deep_l r m sf) end
        else let val vm = a_plus (vpr, measure_tree (force m))
-            in if p vm then let
-                   val (ml, xs, mr) = splitTree_m' p vpr (force m)
+            in if n < vm then let
+                   val (ml, xs, mr) = splitTree_m' n vpr (force m)
                    val xs = unN xs
-                   val (l, x, r) = splitDigit p (a_plus (vpr,
+                   val (l, x, r) = splitDigit n (a_plus (vpr,
                                                              measure_tree ml))
                                               (toList_node xs)
                in (deep_r pr (eager ml) l, x, deep_l r (eager mr) sf) end
 
-               else let val (l, x, r) = splitDigit p vm sf
+               else let val (l, x, r) = splitDigit n vm sf
                     in (deep_r pr m l, x, toTree_f_m foldr r) end
             end
     end
     | splitTree_m' _ _ Empty = raise NotFound
 
 
-  fun splitPredLazy3 p t =
-    let val (l, x, r) = splitTree_m p a_ident t
+  fun splitLazy3 n t =
+    let val (l, x, r) = splitTree_m n a_ident t
     in (l, unO x, r) end
 
-  fun splitPred3 p t =
-    let val (l, x, r) = splitTree_m' p a_ident t
+  fun split3 n t =
+    let val (l, x, r) = splitTree_m' n a_ident t
     in (l, unO x, r) end
-(*
-  fun splitPred3 p t =
-    let val (l, x, r) = splitPredLazy3 p t
-    in (force l, x, force r) end
-*)
 
   fun splitLazy i Empty = (eager empty, eager empty)
     | splitLazy i t =
       if i < measure_tree t then
-          let val (l, x, r) = splitPredLazy3 (fn i' => i < i') t
+          let val (l, x, r) = splitLazy3 i t
           in (l, delay (fn _=>fcons x (force r))) end
       else
           (eager t, eager empty)
@@ -389,7 +384,7 @@ struct
   fun split i Empty = (Empty, Empty)
     | split i t =
       if i < measure_tree t then
-          let val (l, x, r) = splitPred3 (fn i' => i < i') t
+          let val (l, x, r) = split3 i t
           in (l, fcons x r) end
       else
           (t, Empty)
@@ -420,9 +415,6 @@ struct
   type 'a seq = 'a finger_tree
 
   infixr 5 << >< infix 5 >> open Infix
-
-  fun splitLazy3 i t = splitPredLazy3 (fn i' => i < i') t
-  fun split3 i t = splitPred3 (fn i' => i < i') t
 
   val length = measure
 
