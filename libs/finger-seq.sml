@@ -78,6 +78,7 @@ sig
     val viewlr : 'a finger_tree -> 'a viewl
 
     exception NotFound
+                  (*
     val splitPredLazy3 : (annot -> bool) -> 'a finger_tree
                          -> 'a finger_tree Susp.susp * 'a *
                             'a finger_tree Susp.susp
@@ -87,6 +88,7 @@ sig
                         -> 'a finger_tree Susp.susp * 'a finger_tree Susp.susp
     val splitPred : (annot -> bool) -> 'a finger_tree
                     -> 'a finger_tree * 'a finger_tree
+                  *)
 
     val forceAll : 'a finger_tree -> 'a finger_tree
 end
@@ -376,18 +378,18 @@ struct
     in (force l, x, force r) end
 *)
 
-  fun splitPredLazy p Empty = (eager empty, eager empty)
-    | splitPredLazy p t =
-      if p (measure_tree t) then
-          let val (l, x, r) = splitPredLazy3 p t
+  fun splitLazy i Empty = (eager empty, eager empty)
+    | splitLazy i t =
+      if i < measure_tree t then
+          let val (l, x, r) = splitPredLazy3 (fn i' => i < i') t
           in (l, delay (fn _=>fcons x (force r))) end
       else
           (eager t, eager empty)
 
-  fun splitPred p Empty = (Empty, Empty)
-    | splitPred p t =
-      if p (measure_tree t) then
-          let val (l, x, r) = splitPred3 p t
+  fun split i Empty = (Empty, Empty)
+    | split i t =
+      if i < measure_tree t then
+          let val (l, x, r) = splitPred3 (fn i' => i < i') t
           in (l, fcons x r) end
       else
           (t, Empty)
@@ -421,8 +423,6 @@ struct
 
   fun splitLazy3 i t = splitPredLazy3 (fn i' => i < i') t
   fun split3 i t = splitPred3 (fn i' => i < i') t
-  fun splitLazy i t = splitPredLazy (fn i' => i < i') t
-  fun split i t = splitPred (fn i' => i < i') t
 
   val length = measure
 
