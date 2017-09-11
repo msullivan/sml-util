@@ -103,6 +103,17 @@ in
     (case next gen of
          NONE => []
        | SOME x => x :: collect gen)
+  fun take 0 gen = []
+    | take n gen =
+    (case next gen of
+         NONE => []
+       | SOME x => x :: take (n-1) gen)
+
+  fun foldl f z gen =
+    (case next gen of
+         NONE => z
+       | SOME x => foldl f (f (x, z)) gen)
+  fun foreach gen f = foldl (fn (x, ()) => f x) () gen
 
 end
 
@@ -123,12 +134,19 @@ in
      ())
   fun stupid_gen () = mk_gen stupid_gen'
 
+  fun nats' yield =
+    let fun loop i = (yield i; loop (i+1))
+    in loop 0 end
+  fun nats () = mk_gen nats'
+
+
   fun is_prime n =
     let
         val sq = Real.ceil (Math.sqrt (Real.fromInt n))
         fun loop i = if i > sq then true else
                      n mod i <> 0 andalso loop (i+1)
-    in loop 2 end
+    in n = 2 orelse n >= 2 andalso loop 2 end
+
   fun primes' yield =
     let val () = yield 2
         fun loop i =
@@ -136,6 +154,11 @@ in
            loop (i+2))
     in loop 3 end
   fun primes () = mk_gen primes'
+
+  fun primes2' yield =
+    CoroUtil.foreach (nats ()) (
+        fn i => if is_prime i then yield i else ())
+  fun primes2 () = mk_gen primes2'
 
 
 
